@@ -62,6 +62,11 @@
     })[char]);
   }
 
+  function caseButtonHtml(item, rank, selectedId, selectedCount) {
+    const [kind, label] = statusLabel(item, rank, selectedCount);
+    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.id)} CT 열기"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><small>${escapeHtml(item.reasons[0])}</small><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><span class="viewer-cta" aria-hidden="true">CT 열기 <b>→</b></span></span><span class="score"><strong>${Number(item.score)}</strong><small>review score</small></span></button>`;
+  }
+
   function clampSlice(value, totalSlices) {
     const total = Math.max(1, Math.floor(Number(totalSlices) || 1));
     return Math.max(0, Math.min(total - 1, Math.round(Number(value) || 0)));
@@ -280,8 +285,7 @@
       // HTML templates only receive source-controlled demo data; every interpolated string is escaped.
       list.innerHTML = visible.map(item => {
         const rank = cases.findIndex(c => c.id === item.id);
-        const [kind,label] = statusLabel(item, rank, summary.selected);
-        return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}"><span class="rank">${String(rank+1).padStart(2,'0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><small>${escapeHtml(item.reasons[0])}</small><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span></span><span class="score"><strong>${Number(item.score)}</strong><small>review score</small></span></button>`;
+        return caseButtonHtml(item, rank, selectedId, summary.selected);
       }).join('');
       const selected = visibleSelection(visible, selectedId);
       if (selected) selectedId = selected.id;
@@ -308,5 +312,5 @@
     render();
   }
 
-  return { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, mount };
+  return { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, mount };
 });

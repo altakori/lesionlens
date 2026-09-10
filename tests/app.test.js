@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions } = require('../app.js');
+const { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, caseButtonHtml } = require('../app.js');
 
 test('priority count rounds workload up and keeps at least one case', () => {
   assert.equal(priorityCount(10, 20), 2);
@@ -31,6 +31,12 @@ test('workload selection overrides stored status label', () => {
 
 test('HTML output escapes future external strings', () => {
   assert.equal(escapeHtml('<img src=x onerror="x">'), '&lt;img src=x onerror=&quot;x&quot;&gt;');
+});
+
+test('case card exposes an obvious CT opening action', () => {
+  const html = caseButtonHtml(cases[0], 0, cases[0].id, 2);
+  assert.match(html, /CT 열기/);
+  assert.match(html, /aria-label="SYN-014 CT 열기"/);
 });
 
 test('slice navigation clamps to the synthetic series bounds', () => {
