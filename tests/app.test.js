@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, caseButtonHtml } = require('../app.js');
 
 test('priority count rounds workload up and keeps at least one case', () => {
@@ -31,6 +32,12 @@ test('workload selection overrides stored status label', () => {
 
 test('HTML output escapes future external strings', () => {
   assert.equal(escapeHtml('<img src=x onerror="x">'), '&lt;img src=x onerror=&quot;x&quot;&gt;');
+});
+
+test('browser assets are cache-busted so a reload cannot mix app versions', () => {
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
+  assert.match(html, /styles\.css\?v=[a-z0-9-]+/);
+  assert.match(html, /app\.js\?v=[a-z0-9-]+/);
 });
 
 test('case card exposes an obvious CT opening action', () => {
