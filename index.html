@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="LesionLens 합성 데이터 기반 재검토 우선순위 대시보드">
   <title>LesionLens · Review priority</title>
-  <link rel="stylesheet" href="styles.css?v=ct-viewer-3">
+  <link rel="stylesheet" href="styles.css?v=mentoring-ui-1">
 </head>
 <body>
   <header class="topbar">
@@ -20,8 +20,8 @@
     <section class="hero" aria-labelledby="page-title">
       <div>
         <p class="eyebrow">Human-in-the-loop quality review</p>
-        <h1 id="page-title">놓칠 가능성이 큰 검사를<br><em>먼저 다시 봅니다.</em></h1>
-        <p class="hero-copy">두 분할 모델의 불일치와 작은 병변 후보, 영상 품질 신호를 한 대기열에서 설명합니다. 점수는 진단 확률이 아닌 추가 확인 가치입니다.</p>
+        <h1 id="page-title">추가 확인 가치가 큰 검사를<br><em>먼저 다시 봅니다.</em></h1>
+        <p class="hero-copy">여러 간 CT를 검토하는 영상의학과 의료진이 모델 불일치·작은 후보·영상 품질 근거를 보고, 모든 사례를 빠짐없이 검토하도록 순서를 정합니다.</p>
       </div>
       <aside class="safety-card">
         <span class="safety-icon">!</span>
@@ -30,36 +30,48 @@
     </section>
 
     <section class="metrics" aria-label="대기열 요약">
-      <article><span>검토 대상</span><strong id="visibleCount">0</strong><small>synthetic cases</small></article>
-      <article><span>우선 재검토</span><strong id="priorityCount">0</strong><small>selected workload</small></article>
-      <article><span>FN 부담 포착</span><strong id="captureRate">0%</strong><small>demo ground truth</small></article>
-      <article><span>품질 확인</span><strong id="qualityCount">0</strong><small>quality flags</small></article>
+      <article><span>전체 대기열</span><strong id="visibleCount">0</strong><small>모든 합성 사례 유지</small></article>
+      <article><span>먼저 확인</span><strong id="priorityCount">0</strong><small>추가 검토 근거가 있는 사례</small></article>
+      <article><span>품질 확인</span><strong id="qualityCount">0</strong><small>기술적 확인이 필요한 사례</small></article>
     </section>
 
     <section class="workspace" id="queue">
       <div class="queue-panel">
         <div class="section-head">
           <div><p class="eyebrow">Review queue</p><h2>재검토 대기열</h2></div>
-          <label class="workload">검토량
-            <select id="workloadSelect" aria-label="재검토 비율">
-              <option value="10">상위 10%</option>
-              <option value="20" selected>상위 20%</option>
-              <option value="30">상위 30%</option>
+          <label class="sort-control">정렬 · 확인 순서만 변경
+            <select id="sortSelect">
+              <option value="review" selected>추가 확인 가치 순</option>
+              <option value="quality">영상 품질 신호 순</option>
+              <option value="id">사례 ID 순</option>
             </select>
           </label>
         </div>
-        <div class="filters" role="group" aria-label="대기열 필터">
+        <p class="queue-policy">모든 사례는 대기열에 유지됩니다. 정렬은 순서만 바꿉니다. 보기 필터는 탐색용이며, 숨겨진 사례가 안전하거나 검토 불필요하다는 뜻이 아닙니다.</p>
+        <div class="filters" role="group" aria-label="보기 필터 · 탐색용">
           <button class="filter active" data-filter="all" aria-pressed="true">전체</button>
-          <button class="filter" data-filter="priority" aria-pressed="false">우선 재검토</button>
+          <button class="filter" data-filter="priority" aria-pressed="false">먼저 확인</button>
           <button class="filter" data-filter="quality" aria-pressed="false">품질 확인</button>
         </div>
         <p class="queue-hint">아래 사례의 <strong>CT 열기</strong>를 눌러 합성 CT를 확인하세요.</p>
+        <p id="viewCount" class="view-count" role="status"></p>
         <div id="caseList" class="case-list" aria-live="polite"></div>
       </div>
 
       <aside class="detail-panel" id="detailPanel" aria-live="polite">
         <div class="empty-state">대기열에서 사례를 선택하세요.</div>
       </aside>
+    </section>
+
+    <section class="criteria" aria-labelledby="criteria-title">
+      <p class="eyebrow">Workflow criteria</p>
+      <h2 id="criteria-title">이 순서로 표시한 이유</h2>
+      <p class="queue-policy">합성 데모의 작업 순서 라벨입니다. 점수와 수치는 합성 신호이며 진단 확률 아님.</p>
+      <div class="criteria-grid">
+        <article><h3>먼저 확인</h3><p>모델 불일치나 작은·경계 인접 후보로 추가 검토할 근거가 있습니다. 후보는 오탐일 수 있습니다.</p></article>
+        <article><h3>품질 확인</h3><p>절편 간격·영상 품질 신호를 기술적으로 확인합니다. 품질 신호는 질환 위험과 별개입니다.</p></article>
+        <article><h3>일반 순서</h3><p>현재 데모 분류에서 먼저 확인·품질 확인 대상으로 지정되지 않은 사례입니다. 정상 판정이 아니며 모델 공통 실패가 남을 수 있습니다.</p></article>
+      </div>
     </section>
 
     <section class="method">
@@ -75,6 +87,6 @@
   </main>
 
   <footer>LesionLens MVP · synthetic demonstration only</footer>
-  <script src="app.js?v=ct-viewer-3"></script>
+  <script src="app.js?v=mentoring-ui-1"></script>
 </body>
 </html>
