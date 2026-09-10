@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="LesionLens 합성 데이터 기반 재검토 우선순위 대시보드">
   <title>LesionLens · Review priority</title>
-  <link rel="stylesheet" href="styles.css?v=ct-viewer-3">
+  <link rel="stylesheet" href="styles.css?v=real-ct-3">
 </head>
 <body>
   <header class="topbar">
@@ -13,7 +13,7 @@
       <span class="brand-mark" aria-hidden="true">L</span>
       <span><strong>LesionLens</strong><small>review priority workspace</small></span>
     </a>
-    <div class="status"><span></span> Synthetic demo · no PHI</div>
+    <div class="status"><span></span> Local research demo · no PHI</div>
   </header>
 
   <main>
@@ -25,11 +25,41 @@
       </div>
       <aside class="safety-card">
         <span class="safety-icon">!</span>
-        <div><strong>의료진 판단 보조용 연구 데모</strong><p>합성 사례만 사용하며 진단·치료 권고를 생성하지 않습니다.</p></div>
+        <div><strong>의료진 판단 보조용 연구 데모</strong><p>공개 비식별 LiTS CT와 합성 대기열을 사용하며 진단·치료 권고를 생성하지 않습니다.</p></div>
       </aside>
     </section>
 
-    <section class="metrics" aria-label="대기열 요약">
+    <section class="real-ct-section" id="realCtSection" aria-labelledby="real-ct-title">
+      <div class="real-section-head">
+        <div>
+          <p class="eyebrow">Local real CT sample</p>
+          <h2 id="real-ct-title">AI0에서 가져온 실제 공개 CT 3건</h2>
+          <p>LiTS 학습 세트의 비식별 CT에서 종양 주석을 가장 많이 포함하는 연속 24개 절편을 선택했습니다. 분홍 표시는 <strong>종양 정답 주석(GT)</strong>이며 AI 예측이나 진단 결과가 아닙니다.</p>
+        </div>
+        <span class="real-status" id="realDataStatus" role="status" aria-live="polite">로컬 데이터 확인 중</span>
+      </div>
+      <p id="realCtUnavailable" class="real-unavailable" hidden>이 로컬 PC에 실제 CT 파일이 없어서 합성 데모만 표시합니다.</p>
+      <div class="real-ct-grid">
+        <div id="realCaseList" class="real-case-list" aria-label="실제 공개 CT 사례"></div>
+        <section class="real-viewer" aria-label="실제 공개 CT 뷰어">
+          <div class="real-toolbar"><strong>Axial CT · public LiTS</strong><button id="realOverlayToggle" type="button" aria-pressed="true">GT 주석 숨기기</button></div>
+          <div class="real-image-frame" id="realImageFrame">
+            <img id="realCtImage" tabindex="0" alt="실제 공개 CT 불러오는 중">
+            <img id="realOverlayImage" alt="LiTS 종양 정답 주석">
+          </div>
+          <p id="realCtDescription" class="ct-description" aria-live="polite"></p>
+          <div class="slice-control">
+            <button id="realPreviousSlice" type="button" aria-label="이전 실제 CT 절편">−</button>
+            <label>절편 <strong id="realSliceLabel">- / -</strong>
+              <input id="realSliceSlider" type="range" min="0" max="23" value="0" aria-label="실제 CT 절편">
+            </label>
+            <button id="realNextSlice" type="button" aria-label="다음 실제 CT 절편">＋</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="합성 대기열 요약">
       <article><span>검토 대상</span><strong id="visibleCount">0</strong><small>synthetic cases</small></article>
       <article><span>우선 재검토</span><strong id="priorityCount">0</strong><small>selected workload</small></article>
       <article><span>FN 부담 포착</span><strong id="captureRate">0%</strong><small>demo ground truth</small></article>
@@ -74,7 +104,7 @@
     </section>
   </main>
 
-  <footer>LesionLens MVP · synthetic demonstration only</footer>
-  <script src="app.js?v=ct-viewer-3"></script>
+  <footer>LesionLens MVP · local research demonstration only</footer>
+  <script src="app.js?v=real-ct-3"></script>
 </body>
 </html>

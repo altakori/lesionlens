@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, caseButtonHtml } = require('../app.js');
+const { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, caseButtonHtml, normalizeRealManifest } = require('../app.js');
 
 test('priority count rounds workload up and keeps at least one case', () => {
   assert.equal(priorityCount(10, 20), 2);
@@ -69,4 +69,79 @@ test('synthetic lesion locations are deterministic and slice-local', () => {
   assert.deepEqual(a, b);
   assert.ok(a.every(x => x.x >= 0 && x.x <= 1 && x.y >= 0 && x.y <= 1 && x.radius > 0));
   assert.notDeepEqual(a, syntheticLesions('SYN-014', 2, 24));
+});
+
+function realManifest() {
+  return {
+    version: 'ai0-lits-local-v1',
+    localOnly: true,
+    sourceLabel: 'AI0 public sample',
+    cases: Array.from({ length: 3 }, (_, caseIndex) => {
+      const id = `LL-CT-00${caseIndex + 1}`;
+      return {
+        id,
+        label: '공개 LiTS 학습 샘플',
+        sourceCaseId: 'must-not-reach-browser-state',
+        sliceCount: 24,
+        slices: Array.from({ length: 24 }, (_, sliceIndex) => ({
+          index: sliceIndex + 1,
+          sourceSlice: 10 + sliceIndex,
+          width: 512,
+          height: 512,
+          ct: `data/real_cases/web/${id}/ct/${String(sliceIndex + 1).padStart(2, '0')}.webp`,
+          overlay: `data/real_cases/web/${id}/overlay/${String(sliceIndex + 1).padStart(2, '0')}.png`,
+          ctSha256: 'a'.repeat(64),
+          overlaySha256: 'b'.repeat(64),
+          tumorPixels: 5
+        }))
+      };
+    })
+  };
+}
+
+test('real manifest accepts exactly three local aliased 24-slice cases and drops source metadata', () => {
+  const normalized = normalizeRealManifest(realManifest());
+  assert.equal(normalized.length, 3);
+  assert.equal(normalized[0].id, 'LL-CT-001');
+  assert.equal(normalized[0].slices.length, 24);
+  assert.deepEqual(normalized[0].slices[0], {
+    index: 1,
+    sourceSlice: 10,
+    width: 512,
+    height: 512,
+    ct: 'data/real_cases/web/LL-CT-001/ct/01.webp',
+    overlay: 'data/real_cases/web/LL-CT-001/overlay/01.png',
+    ctSha256: 'a'.repeat(64),
+    overlaySha256: 'b'.repeat(64),
+    tumorPixels: 5
+  });
+  assert.equal(Object.hasOwn(normalized[0], 'sourceCaseId'), false);
+});
+
+test('real manifest rejects wrong version, non-local, alias mismatch, and non-sequential slices', () => {
+  const wrongVersion = realManifest();
+  wrongVersion.version = 'unknown';
+  assert.deepEqual(normalizeRealManifest(wrongVersion), []);
+
+  const nonLocal = realManifest();
+  nonLocal.localOnly = false;
+  assert.deepEqual(normalizeRealManifest(nonLocal), []);
+
+  const mismatch = realManifest();
+  mismatch.cases[0].slices[0].ct = 'data/real_cases/web/LL-CT-999/ct/01.webp';
+  assert.deepEqual(normalizeRealManifest(mismatch), []);
+
+  const badIndex = realManifest();
+  badIndex.cases[1].slices[3].index = Number.NaN;
+  assert.deepEqual(normalizeRealManifest(badIndex), []);
+
+  const badHash = realManifest();
+  badHash.cases[2].slices[2].ctSha256 = 'not-a-sha256';
+  assert.deepEqual(normalizeRealManifest(badHash), []);
+});
+
+test('CSP-compatible signal bars use progress elements instead of inline styles', () => {
+  const source = fs.readFileSync(new URL('../app.js', `file://${__filename}`), 'utf8');
+  assert.match(source, /<progress class="bar/);
+  assert.doesNotMatch(source, /style="width:/);
 });
