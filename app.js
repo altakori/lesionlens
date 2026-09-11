@@ -7,14 +7,14 @@
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const cases = [
-    { id:'SYN-014', score:92, status:'priority', disagreement:88, smallCandidate:91, quality:22, fn:2, reasons:['모델 간 종양 마스크 차이 34%','10 mm 미만 후보 2개','recall 지향 모델만 표시한 후보 존재'] },
+    { id:'SYN-014', score:92, status:'priority', disagreement:88, smallCandidate:91, quality:22, fn:2, reasons:['모델 간 종양 마스크 차이 34%','10 mm 미만 후보 2개','한 모델만 표시한 합성 후보 존재'] },
     { id:'SYN-003', score:86, status:'quality', disagreement:54, smallCandidate:61, quality:89, fn:1, reasons:['절편 간격 품질 플래그','경계부 마스크 변동','영상 품질 확인 후 모델 결과 해석 필요'] },
     { id:'SYN-021', score:81, status:'priority', disagreement:83, smallCandidate:78, quality:31, fn:2, reasons:['두 모델의 연결요소 수 불일치','작은 병변 후보 1개','간 경계 인접 후보로 추가 확인 필요'] },
-    { id:'SYN-008', score:74, status:'routine', disagreement:68, smallCandidate:72, quality:18, fn:1, reasons:['작은 연결요소 후보','모델별 예측 부피 차이','공통 실패 가능성은 별도 확인 필요'] },
-    { id:'SYN-017', score:67, status:'routine', disagreement:61, smallCandidate:57, quality:40, fn:0, reasons:['중간 수준 모델 불일치','품질 신호 경미','현재 operating point에서는 일반 검토'] },
+    { id:'SYN-008', score:74, status:'priority', disagreement:68, smallCandidate:72, quality:18, fn:1, reasons:['작은 연결요소 후보','모델별 예측 부피 차이','공통 실패 가능성은 별도 확인 필요'] },
+    { id:'SYN-017', score:67, status:'routine', disagreement:61, smallCandidate:57, quality:40, fn:0, reasons:['중간 수준 모델 불일치','품질 신호 경미','현재 분류 기준에서는 일반 검토'] },
     { id:'SYN-011', score:58, status:'routine', disagreement:46, smallCandidate:52, quality:35, fn:0, reasons:['낮은 불일치','작은 후보 신호 약함','일반 검토 대기열 유지'] },
     { id:'SYN-026', score:51, status:'quality', disagreement:29, smallCandidate:35, quality:84, fn:0, reasons:['영상 품질 플래그 우세','모델 예측은 비교적 일치','품질 확인 후 일반 검토'] },
-    { id:'SYN-005', score:43, status:'routine', disagreement:38, smallCandidate:41, quality:19, fn:0, reasons:['낮은 위험 신호','모델 간 차이 작음','일반 검토 대기열 유지'] },
+    { id:'SYN-005', score:43, status:'routine', disagreement:38, smallCandidate:41, quality:19, fn:0, reasons:['낮은 추가 확인 신호','모델 간 차이 작음','일반 검토 대기열 유지'] },
     { id:'SYN-019', score:34, status:'routine', disagreement:25, smallCandidate:30, quality:28, fn:0, reasons:['낮은 불일치','품질 플래그 없음','모델 공통 실패는 점수만으로 배제 불가'] },
     { id:'SYN-002', score:23, status:'routine', disagreement:17, smallCandidate:21, quality:14, fn:0, reasons:['현재 특징상 낮은 추가 확인 가치','일반 검토 유지','점수는 정상 판정이 아님'] }
   ];
@@ -39,10 +39,17 @@
     };
   }
 
-  function filteredCases(items, filter, percent) {
-    const top = priorityCount(items.length, percent);
-    if (filter === 'priority') return items.slice(0, top);
-    if (filter === 'quality') return items.filter(item => item.status === 'quality');
+  function sortedCases(items, sort = 'review') {
+    return [...items].sort((a, b) => {
+      const byId = a.id.localeCompare(b.id);
+      if (sort === 'id') return byId;
+      if (sort === 'quality') return b.quality - a.quality || b.score - a.score || byId;
+      return b.score - a.score || byId;
+    });
+  }
+
+  function filteredCases(items, filter) {
+    if (filter === 'priority' || filter === 'quality') return items.filter(item => item.status === filter);
     return items;
   }
 
@@ -50,10 +57,10 @@
     return items.find(item => item.id === selectedId) || items[0] || null;
   }
 
-  function statusLabel(item, rank, selectedCount) {
-    if (rank < selectedCount) return ['priority', '우선 재검토'];
+  function statusLabel(item) {
+    if (item.status === 'priority') return ['priority', '먼저 확인'];
     if (item.status === 'quality') return ['quality', '품질 확인'];
-    return ['routine', '일반'];
+    return ['routine', '일반 순서'];
   }
 
   function escapeHtml(value) {
@@ -62,9 +69,9 @@
     })[char]);
   }
 
-  function caseButtonHtml(item, rank, selectedId, selectedCount) {
-    const [kind, label] = statusLabel(item, rank, selectedCount);
-    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.id)} CT 열기" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><small>${escapeHtml(item.reasons[0])}</small><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><span class="viewer-cta" aria-hidden="true">CT 열기 <b>→</b></span></span><span class="score"><strong>${Number(item.score)}</strong><small>review score</small></span></button>`;
+  function caseButtonHtml(item, rank, selectedId) {
+    const [kind, label] = statusLabel(item);
+    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><small class="reason-tag">${escapeHtml(item.reasons[0])}</small><span class="viewer-cta">CT 열기 <b aria-hidden="true">→</b></span></span><span class="score"><strong>${Number(item.score)}</strong><small>추가 확인 가치<br>합성 신호<br>확률 아님</small></span></button>`;
   }
 
   function clampSlice(value, totalSlices) {
@@ -343,7 +350,7 @@
   function mount(doc) {
     const list = doc.getElementById('caseList');
     const detail = doc.getElementById('detailPanel');
-    const workload = doc.getElementById('workloadSelect');
+    const sortSelect = doc.getElementById('sortSelect');
     let filter = 'all';
     let selectedId = cases[0].id;
     let selectedSlice = 11;
@@ -351,16 +358,15 @@
     let focusViewerAfterRender = false;
     const totalSlices = 24;
 
-    function renderDetail(item, selectedCount) {
-      const rank = cases.findIndex(c => c.id === item.id);
-      const [, label] = statusLabel(item, rank, selectedCount);
+    function renderDetail(item) {
+      const [, label] = statusLabel(item);
       detail.innerHTML = `
-        <div class="detail-hero"><small>${escapeHtml(label)}</small><h2>${escapeHtml(item.id)}</h2><p>Review value score · ${Number(item.score)}</p></div>
+        <div class="detail-hero"><small>${escapeHtml(label)}</small><h2>${escapeHtml(item.id)}</h2><p>추가 확인 가치 · ${Number(item.score)}</p><p class="signal-note">합성 신호 · 진단 확률 아님</p></div>
         <div class="detail-body">
           <section class="ct-viewer" aria-label="${escapeHtml(item.id)} 합성 CT 뷰어">
             <div class="ct-toolbar">
               <div><strong>Axial CT</strong><span>합성 영상 · 실제 환자자료 아님</span></div>
-              <button id="overlayToggle" type="button" aria-pressed="${showOverlay}">${showOverlay ? '표시 숨기기' : '후보 표시'}</button>
+              <button id="overlayToggle" type="button" aria-pressed="${showOverlay}">${showOverlay ? '후보 표시 숨기기' : '후보 표시'}</button>
             </div>
             <canvas id="ctCanvas" width="420" height="420" tabindex="0" aria-label="마우스 휠 또는 아래 슬라이더로 절편 이동">합성 축상 CT 뷰어입니다. 아래 절편 설명을 확인하세요.</canvas>
             <p id="ctDescription" class="ct-description" aria-live="polite"></p>
@@ -372,13 +378,16 @@
               <button id="nextSlice" type="button" aria-label="다음 절편">＋</button>
             </div>
           </section>
-          <h3>순위가 올라간 이유</h3>
+          <h3>사례별 검토 근거</h3>
           <ul class="reason-list">${item.reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>
+          <h3>확인할 항목</h3>
+          <p class="inspect-note">${item.status === 'quality' ? '절편 간격과 영상 품질 플래그를 먼저 확인하고 모델 표시를 비교하세요.' : item.status === 'priority' ? '절편을 이동하며 모델 표시 차이와 작은 후보·경계 인접 위치를 비교하세요.' : '전체 절편과 모델 표시를 일반 순서로 검토하세요. 낮은 신호만으로 검토를 생략하지 않습니다.'}</p>
           <h3>신호 구성</h3>
+          <p class="signal-note">모든 수치는 합성 데모 신호이며 진단 확률 아님.</p>
           <div class="model-bars">
             ${[['모델 불일치',item.disagreement,''],['작은 병변 후보',item.smallCandidate,'pink'],['영상 품질',item.quality,'']].map(([name,value,cls]) => `<div><div class="bar-label"><span>${escapeHtml(name)}</span><strong>${Number(value)}</strong></div><progress class="bar ${escapeHtml(cls)}" max="100" value="${Math.max(0, Math.min(100, Number(value)))}" aria-label="${escapeHtml(name)} ${Math.max(0, Math.min(100, Number(value)))}"></progress></div>`).join('')}
           </div>
-          <div class="limitation"><strong>해석 한계</strong><br>두 모델이 같은 병변을 함께 놓친 경우에는 불일치 점수가 낮을 수 있습니다. 최종 판단은 의료진이 수행합니다.</div>
+          <div class="limitation"><strong>해석 한계</strong><br>합성 영상·신호로 실제 성능을 입증하지 않습니다. 후보는 오탐일 수 있고 품질 신호는 질환 위험과 별개입니다. 두 모델의 공통 실패는 낮은 점수로 배제할 수 없으며 일반 순서는 정상 판정이 아닙니다. 최종 판단은 의료진이 수행합니다.</div>
         </div>`;
 
       const canvas = doc.getElementById('ctCanvas');
@@ -403,7 +412,7 @@
       doc.getElementById('overlayToggle').addEventListener('click', event => {
         showOverlay = !showOverlay;
         event.currentTarget.setAttribute('aria-pressed', String(showOverlay));
-        event.currentTarget.textContent = showOverlay ? '표시 숨기기' : '후보 표시';
+        event.currentTarget.textContent = showOverlay ? '후보 표시 숨기기' : '후보 표시';
         refreshSlice(selectedSlice);
       });
       canvas.addEventListener('wheel', event => {
@@ -422,25 +431,25 @@
       if (focusViewerAfterRender) {
         focusViewerAfterRender = false;
         canvas.focus({ preventScroll: true });
+        canvas.scrollIntoView({ block: 'center', behavior: 'instant' });
       }
     }
 
     function render() {
-      const percent = Number(workload.value);
-      const summary = queueSummary(cases, percent);
-      doc.getElementById('visibleCount').textContent = summary.total;
-      doc.getElementById('priorityCount').textContent = summary.selected;
-      doc.getElementById('captureRate').textContent = `${summary.captureRate}%`;
-      doc.getElementById('qualityCount').textContent = summary.qualityCount;
-      const visible = filteredCases(cases, filter, percent);
+      const ranked = sortedCases(cases, sortSelect.value);
+      const visible = filteredCases(ranked, filter);
+      doc.getElementById('visibleCount').textContent = cases.length;
+      doc.getElementById('priorityCount').textContent = filteredCases(cases, 'priority').length;
+      doc.getElementById('qualityCount').textContent = filteredCases(cases, 'quality').length;
+      doc.getElementById('viewCount').textContent = `${visible.length} / ${cases.length} 사례 표시`;
       const selected = visibleSelection(visible, selectedId);
       if (selected) selectedId = selected.id;
       // HTML templates only receive source-controlled demo data; every interpolated string is escaped.
       list.innerHTML = visible.map(item => {
-        const rank = cases.findIndex(c => c.id === item.id);
-        return caseButtonHtml(item, rank, selectedId, summary.selected);
+        const rank = ranked.findIndex(c => c.id === item.id);
+        return caseButtonHtml(item, rank, selectedId);
       }).join('');
-      if (selected) renderDetail(selected, summary.selected);
+      if (selected) renderDetail(selected);
       list.querySelectorAll('.case').forEach(button => button.addEventListener('click', () => {
         selectedId = button.dataset.id;
         selectedSlice = 11;
@@ -449,7 +458,7 @@
       }));
     }
 
-    workload.addEventListener('change', render);
+    sortSelect.addEventListener('change', render);
     doc.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
       doc.querySelectorAll('.filter').forEach(b => {
         b.classList.remove('active');
@@ -464,5 +473,5 @@
     mountRealCases(doc);
   }
 
-  return { cases, priorityCount, queueSummary, filteredCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, normalizeRealManifest, mountRealCases, mount };
+  return { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, normalizeRealManifest, mountRealCases, mount };
 });
