@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="LesionLens 합성 대기열 기반 재검토 연구 데모와 별도 로컬 LiTS CT 참고 뷰어">
   <title>LesionLens · Review priority</title>
-  <link rel="stylesheet" href="styles.css?v=mentoring-raw-2">
+  <link rel="stylesheet" href="styles.css?v=category-tags-1">
 </head>
 <body>
   <header class="topbar">
@@ -50,12 +50,17 @@
             </select>
           </label>
         </div>
-        <p class="queue-policy">모든 사례는 대기열에 유지됩니다. 정렬은 순서만 바꿉니다. 보기 필터는 탐색용이며, 숨겨진 사례가 안전하거나 검토 불필요하다는 뜻이 아닙니다.</p>
-        <div class="filters" role="group" aria-label="보기 필터 · 탐색용">
+        <p class="queue-policy">모든 사례는 대기열에 유지됩니다. 아래 카테고리는 관찰된 합성 영상 특징을 탐색하는 필터이며 임상 위험도·안전·정상 여부를 판정하지 않습니다.</p>
+        <div class="filters" role="group" aria-label="합성 영상 특징 카테고리 필터 · 탐색용">
           <button class="filter active" data-filter="all" aria-pressed="true">전체</button>
-          <button class="filter" data-filter="priority" aria-pressed="false">먼저 확인</button>
-          <button class="filter" data-filter="quality" aria-pressed="false">품질 확인</button>
+          <button class="filter" data-filter="large" aria-pressed="false">큰 병변 후보</button>
+          <button class="filter" data-filter="early" aria-pressed="false">작은 후보·조기 확인</button>
+          <button class="filter" data-filter="multifocal" aria-pressed="false">다발성·분포 확인</button>
+          <button class="filter" data-filter="boundary" aria-pressed="false">경계 인접</button>
+          <button class="filter" data-filter="disagreement" aria-pressed="false">모델 불일치</button>
+          <button class="filter" data-filter="image-quality" aria-pressed="false">영상 품질</button>
         </div>
+        <p class="category-disclaimer"><strong>의료 표현 경계:</strong> 작은 후보는 완치 가능성을, 다발성·분포는 전이 위험을 예측하지 않습니다. 의료진 검토 전에는 임상 위험도 카테고리로 사용하지 않습니다.</p>
         <p class="queue-hint">사례를 선택하면 오른쪽에서 <strong>선정 이유·확인 항목·한계</strong>를 볼 수 있습니다.</p>
         <p id="viewCount" class="view-count" role="status"></p>
         <div id="caseList" class="case-list"></div>
@@ -90,7 +95,7 @@
     <section class="criteria" id="case-map" aria-labelledby="criteria-title">
       <p class="eyebrow">Case map before categories</p>
       <h2 id="criteria-title">현장 사례를 먼저 나열하고 작업 순서로 묶었습니다.</h2>
-      <p class="queue-policy">세 라벨은 임상 판정이 아니라 합성 데모의 작업 순서입니다. 대표 라벨은 다음 행동을 안내하고 상세에는 겹치는 근거를 모두 남깁니다. 사용자 검토 전 임상 기준으로 확정하지 않습니다.</p>
+      <p class="queue-policy">작업 순서 라벨과 영상 특징 카테고리를 구분합니다. 대표 라벨은 다음 행동을 안내하고, 한 사례에 큰 후보·작은 후보·다발성 분포·경계 인접·모델 불일치·영상 품질이 겹치면 상세에 모두 남깁니다. 사용자 검토 전 임상 위험도 기준으로 확정하지 않습니다.</p>
       <div class="case-map-grid">
         <article><span class="badge priority">먼저 확인</span><h3>모델 위치·부피 불일치</h3><p>마스크 차이와 연결요소 수 차이를 함께 표시합니다. 두 모델의 공통 실패는 찾기 어렵습니다.</p></article>
         <article><span class="badge priority">먼저 확인</span><h3>한 모델만 표시한 작은 후보</h3><p>작은 연결요소와 모델 단독 후보를 근거로 남깁니다. 후보는 병변 확률이 아니며 오탐일 수 있습니다.</p></article>
@@ -159,6 +164,6 @@
   </dialog>
 
   <footer>LesionLens MVP · synthetic review-priority workflow · separate local LiTS CT reference</footer>
-  <script src="app.js?v=mentoring-raw-2"></script>
+  <script src="app.js?v=category-tags-1"></script>
 </body>
 </html>

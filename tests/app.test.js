@@ -20,6 +20,23 @@ test('view filters use workflow status rather than a workload cutoff', () => {
   assert.deepEqual(filteredCases(cases, 'all'), cases);
 });
 
+test('clinical-style review categories filter synthetic cases without claiming outcomes', () => {
+  assert.deepEqual(filteredCases(cases, 'large').map(c => c.id), ['SYN-014','SYN-017']);
+  assert.deepEqual(filteredCases(cases, 'early').map(c => c.id), ['SYN-014','SYN-021','SYN-008','SYN-011']);
+  assert.deepEqual(filteredCases(cases, 'multifocal').map(c => c.id), ['SYN-014','SYN-021']);
+  assert.deepEqual(filteredCases(cases, 'boundary').map(c => c.id), ['SYN-003','SYN-021','SYN-008','SYN-005']);
+  assert.deepEqual(filteredCases(cases, 'image-quality').map(c => c.id), ['SYN-003','SYN-017','SYN-026']);
+  assert.deepEqual(filteredCases(cases, 'disagreement').map(c => c.id), ['SYN-014','SYN-003','SYN-021','SYN-008','SYN-017','SYN-011','SYN-005']);
+  assert.ok(cases.every(item => Array.isArray(item.categories)));
+  assert.ok(cases.filter(item => item.signals.includes('작은 병변 후보')).every(item => item.categories.includes('early')));
+  assert.deepEqual(cases.filter(item => item.categories.length === 0).map(item => item.id), ['SYN-019','SYN-002']);
+  const source = fs.readFileSync(new URL('../app.js', `file://${__filename}`), 'utf8');
+  assert.match(source, /class="category-empty">별도 관찰 카테고리 없음/);
+  assert.doesNotMatch(source, /class="category-tag">별도 관찰 카테고리 없음/);
+  assert.match(source, /완치 가능성을 예측하지 않음/);
+  assert.match(source, /전이 위험을 예측하지 않음/);
+});
+
 test('queue sort keeps every case and supports review, quality, and id order', () => {
   const review = sortedCases(cases, 'review');
   const quality = sortedCases(cases, 'quality');
@@ -78,9 +95,11 @@ test('case card opens review rationale without claiming a synthetic CT', () => {
   assert.doesNotMatch(html, /CT 열기/);
   assert.doesNotMatch(html, /aria-label="SYN-014 CT 열기"/);
   assert.match(html, /SYN-014/);
-  assert.match(html, /모델 간 종양 마스크 차이가 큼/);
+  assert.match(html, /큰 병변 후보와 다발성 분포를 함께 확인/);
   assert.match(html, /작은 후보가 여러 개 관찰됨/);
   assert.match(html, /근거 3개/);
+  assert.match(html, /큰 병변 후보/);
+  assert.match(html, /다발성·분포 확인/);
   assert.doesNotMatch(html, /<span class="score">/);
   assert.match(html, /aria-pressed="true"/);
   for (const item of cases) {
@@ -105,8 +124,8 @@ test('raw mentoring feedback is represented by explicit product context and evid
   assert.match(html, /현재 범위 밖/);
   assert.match(html, /기관별 재학습/);
   assert.match(html, /심사 기준/);
-  assert.match(html, /styles\.css\?v=mentoring-raw-2/);
-  assert.match(html, /app\.js\?v=mentoring-raw-2/);
+  assert.match(html, /styles\.css\?v=category-tags-1/);
+  assert.match(html, /app\.js\?v=category-tags-1/);
   assert.ok(html.indexOf('id="queue"') < html.indexOf('id="project-context"'));
 });
 
@@ -354,7 +373,7 @@ test('rendered queue, rationale detail, and CT reference dialog work at mobile a
     await evaluate(`document.querySelector('#sortSelect').value = '${sort}'; document.querySelector('#sortSelect').dispatchEvent(new Event('change'))`);
     assert.deepEqual(await ids(), sortedCases(cases, sort).map(c => c.id));
   }
-  for (const filter of ['quality', 'priority', 'all']) {
+  for (const filter of ['large', 'early', 'multifocal', 'boundary', 'disagreement', 'image-quality', 'all']) {
     await evaluate(`document.querySelector('[data-filter="${filter}"]').click()`);
     assert.deepEqual(await ids(), filteredCases(sortedCases(cases, 'review'), filter).map(c => c.id));
     assert.equal(await evaluate(`document.querySelector('.case[aria-pressed="true"]').dataset.id === document.querySelector('.detail-hero h2').textContent`), true);

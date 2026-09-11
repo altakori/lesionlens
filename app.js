@@ -7,17 +7,26 @@
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const cases = [
-    { id:'SYN-014', status:'priority', fn:2, signals:['모델 불일치','작은 병변 후보'], reasons:['모델 간 종양 마스크 차이가 큼','작은 후보가 여러 개 관찰됨','한 모델만 표시한 합성 후보 존재'] },
-    { id:'SYN-003', status:'quality', fn:1, signals:['영상 품질','모델 불일치'], reasons:['절편 간격 품질 플래그','경계부 마스크 변동','영상 품질 확인 후 모델 결과 해석 필요'] },
-    { id:'SYN-021', status:'priority', fn:2, signals:['모델 불일치','작은 병변 후보'], reasons:['두 모델의 연결요소 수 불일치','작은 병변 후보 관찰','간 경계 인접 후보로 추가 확인 필요'] },
-    { id:'SYN-008', status:'priority', fn:1, signals:['작은 병변 후보','모델 불일치'], reasons:['작은 연결요소 후보','모델별 예측 부피 차이','공통 실패 가능성은 별도 확인 필요'] },
-    { id:'SYN-017', status:'routine', fn:0, signals:['모델 불일치','영상 품질'], reasons:['중간 수준 모델 불일치','품질 신호 경미','현재 분류 기준에서는 일반 검토'] },
-    { id:'SYN-011', status:'routine', fn:0, signals:['모델 불일치','작은 병변 후보'], reasons:['낮은 불일치','작은 후보 신호 약함','일반 검토 대기열 유지'] },
-    { id:'SYN-026', status:'quality', fn:0, signals:['영상 품질'], reasons:['영상 품질 플래그 우세','모델 예측은 비교적 일치','품질 확인 후 일반 검토'] },
-    { id:'SYN-005', status:'routine', fn:0, signals:['모델 불일치'], reasons:['낮은 추가 확인 신호','모델 간 차이 작음','일반 검토 대기열 유지'] },
-    { id:'SYN-019', status:'routine', fn:0, signals:[], reasons:['낮은 불일치','품질 플래그 없음','모델 공통 실패는 낮은 신호로 배제 불가'] },
-    { id:'SYN-002', status:'routine', fn:0, signals:[], reasons:['현재 특징상 낮은 추가 확인 가치','일반 검토 유지','낮은 신호는 정상 판정이 아님'] }
+    { id:'SYN-014', status:'priority', fn:2, categories:['large','early','multifocal','disagreement'], signals:['모델 불일치','작은 병변 후보'], reasons:['큰 병변 후보와 다발성 분포를 함께 확인','작은 후보가 여러 개 관찰됨','한 모델만 표시한 합성 후보 존재'] },
+    { id:'SYN-003', status:'quality', fn:1, categories:['image-quality','boundary','disagreement'], signals:['영상 품질','모델 불일치'], reasons:['절편 간격 품질 플래그','경계부 마스크 변동','영상 품질 확인 후 모델 결과 해석 필요'] },
+    { id:'SYN-021', status:'priority', fn:2, categories:['early','multifocal','boundary','disagreement'], signals:['모델 불일치','작은 병변 후보'], reasons:['여러 연결요소의 분포 확인 필요','작은 병변 후보 관찰','간 경계 인접 후보로 추가 확인 필요'] },
+    { id:'SYN-008', status:'priority', fn:1, categories:['early','boundary','disagreement'], signals:['작은 병변 후보','모델 불일치'], reasons:['작은 후보를 조기에 다시 확인','모델별 예측 부피 차이','경계 인접 위치와 공통 실패 가능성 확인'] },
+    { id:'SYN-017', status:'routine', fn:0, categories:['large','image-quality','disagreement'], signals:['모델 불일치','영상 품질'], reasons:['큰 병변 후보의 범위 확인','중간 수준 모델 불일치','품질 신호와 함께 일반 검토'] },
+    { id:'SYN-011', status:'routine', fn:0, categories:['early','disagreement'], signals:['모델 불일치','작은 병변 후보'], reasons:['작은 후보를 조기에 다시 확인','낮은 불일치','일반 검토 대기열 유지'] },
+    { id:'SYN-026', status:'quality', fn:0, categories:['image-quality'], signals:['영상 품질'], reasons:['영상 품질 플래그 우세','모델 예측은 비교적 일치','품질 확인 후 일반 검토'] },
+    { id:'SYN-005', status:'routine', fn:0, categories:['boundary','disagreement'], signals:['모델 불일치'], reasons:['경계 인접 후보 위치 확인','모델 간 차이 작음','일반 검토 대기열 유지'] },
+    { id:'SYN-019', status:'routine', fn:0, categories:[], signals:[], reasons:['현재 별도 관찰 신호 없음','품질 플래그 없음','모델 공통 실패는 낮은 신호로 배제 불가'] },
+    { id:'SYN-002', status:'routine', fn:0, categories:[], signals:[], reasons:['현재 별도 관찰 신호 없음','일반 검토 유지','낮은 신호는 정상 판정이 아님'] }
   ];
+
+  const categoryLabels = {
+    large: '큰 병변 후보',
+    early: '작은 후보·조기 확인',
+    multifocal: '다발성·분포 확인',
+    boundary: '경계 인접',
+    disagreement: '모델 불일치',
+    'image-quality': '영상 품질'
+  };
 
   function priorityCount(total, percent) {
     if (!Number.isFinite(total) || total <= 0) return 0;
@@ -55,6 +64,7 @@
 
   function filteredCases(items, filter) {
     if (filter === 'priority' || filter === 'quality') return items.filter(item => item.status === filter);
+    if (Object.hasOwn(categoryLabels, filter)) return items.filter(item => item.categories.includes(filter));
     return items;
   }
 
@@ -68,6 +78,10 @@
     return ['routine', '일반 순서'];
   }
 
+  function categoryLabel(category) {
+    return categoryLabels[category] || category;
+  }
+
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -76,8 +90,9 @@
 
   function caseButtonHtml(item, rank, selectedId) {
     const [kind, label] = statusLabel(item);
+    const categoryTags = item.categories.length ? `<span class="category-tags" aria-label="검토 카테고리">${item.categories.map(category => `<small class="category-tag">${escapeHtml(categoryLabel(category))}</small>`).join('')}</span>` : '';
     const reasonTags = item.reasons.slice(0, 2).map(reason => `<small class="reason-tag">${escapeHtml(reason)}</small>`).join('');
-    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><span class="reason-tags">${reasonTags}</span><span class="viewer-cta">검토 근거 보기 <b aria-hidden="true">→</b></span></span><span class="evidence-count"><strong>근거 ${item.reasons.length}개</strong><small>선택 후 전체 확인</small></span></button>`;
+    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span>${categoryTags}<span class="reason-tags">${reasonTags}</span><span class="viewer-cta">검토 근거 보기 <b aria-hidden="true">→</b></span></span><span class="evidence-count"><strong>근거 ${item.reasons.length}개</strong><small>선택 후 전체 확인</small></span></button>`;
   }
 
   function clampSlice(value, totalSlices) {
@@ -285,6 +300,7 @@
 
     function renderDetail(item) {
       const [, label] = statusLabel(item);
+      const categoryTags = item.categories.length ? item.categories.map(category => `<span class="category-tag">${escapeHtml(categoryLabel(category))}</span>`).join('') : '<span class="category-empty">별도 관찰 카테고리 없음</span>';
       const signalItems = item.signals.length
         ? item.signals.map(signal => `<li><strong>${escapeHtml(signal)}</strong><span>합성 상대 신호가 관찰됨</span></li>`).join('')
         : '<li><strong>현재 별도 트리거 없음</strong><span>정상 판정이 아니며 일반 순서로 유지</span></li>';
@@ -292,6 +308,9 @@
         <div class="detail-hero"><small>${escapeHtml(label)}</small><h2 id="selectedCaseTitle" tabindex="-1">${escapeHtml(item.id)}</h2><p>검토 근거 ${item.reasons.length}개</p><p class="signal-note">합성 사례 · 임상 우선순위나 진단 확률 아님</p></div>
         <div class="detail-body">
           <div class="detail-purpose"><strong>이 화면에서 할 일</strong><p>선정 이유와 확인 항목을 읽고 기존 판독·QA 흐름에서 무엇을 먼저 다시 볼지 결정합니다.</p></div>
+          <h3>검토 카테고리</h3>
+          <div class="detail-category-tags">${categoryTags}</div>
+          <p class="category-boundary">카테고리는 합성 영상 특징을 묶은 탐색 기준입니다. <strong>작은 후보·조기 확인은 완치 가능성을 예측하지 않음</strong>, <strong>다발성·분포 확인은 전이 위험을 예측하지 않음</strong>을 뜻합니다.</p>
           <h3>사례별 검토 근거</h3>
           <ul class="reason-list">${item.reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>
           <h3>확인할 항목</h3>
@@ -353,5 +372,5 @@
     render();
   }
 
-  return { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, normalizeRealManifest, mountRealCases, mount };
+  return { cases, categoryLabel, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, normalizeRealManifest, mountRealCases, mount };
 });

@@ -17,6 +17,8 @@ Revise the static LesionLens MVP so a first-time non-developer can understand wi
 - Default queue never removes lower-ranked cases.
 - View filters are navigation aids only, never safety or diagnosis decisions.
 - `먼저 확인`, `품질 확인`, `일반 순서` are workflow labels, not clinical urgency.
+- Category filters may group observable synthetic features (`큰 병변 후보`, `작은 후보·조기 확인`, `다발성·분포 확인`, `경계 인접`, `모델 불일치`, `영상 품질`) and each case may carry multiple tags.
+- `작은 후보·조기 확인` must not imply curability, and `다발성·분포 확인` must not imply metastasis risk.
 - Do not introduce urgency, metastasis, survival, curability, diagnosis, or treatment claims.
 - Keep the CT reference in a contextual dialog using three locally prepared LiTS CT/GT cases. State that dataset GT is not AI output or a diagnosis, is unrelated to the selected synthetic case, and needs provenance/license/de-identification confirmation before external distribution.
 - Preserve keyboard/wheel navigation only for the separately labeled local CT/GT reference dialog.
