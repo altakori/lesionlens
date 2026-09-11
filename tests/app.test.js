@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, caseButtonHtml, normalizeRealManifest } = require('../app.js');
+const { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, clampSlice, sliceValueText, wheelSlice, caseButtonHtml, normalizeRealManifest } = require('../app.js');
 
 test('priority count rounds workload up and keeps at least one case', () => {
   assert.equal(priorityCount(10, 20), 2);
@@ -72,9 +72,10 @@ test('primary queue control sorts rather than truncates the visible queue', () =
   assert.match(html, /안전/);
 });
 
-test('case card exposes an obvious CT opening action', () => {
+test('case card opens review rationale without claiming a synthetic CT', () => {
   const html = caseButtonHtml(cases[0], 0, cases[0].id, 2);
-  assert.match(html, /CT 열기/);
+  assert.match(html, /검토 근거 보기/);
+  assert.doesNotMatch(html, /CT 열기/);
   assert.doesNotMatch(html, /aria-label="SYN-014 CT 열기"/);
   assert.match(html, /SYN-014/);
   assert.match(html, /모델 간 종양 마스크 차이 34%/);
@@ -88,7 +89,7 @@ test('case card exposes an obvious CT opening action', () => {
   }
 });
 
-test('slice navigation clamps to the synthetic series bounds', () => {
+test('slice navigation clamps to the reference CT series bounds', () => {
   assert.equal(clampSlice(-1, 24), 0);
   assert.equal(clampSlice(9, 24), 9);
   assert.equal(clampSlice(99, 24), 23);
@@ -105,12 +106,15 @@ test('wheel navigation ignores horizontal movement and does not move past bounds
   assert.deepEqual(wheelSlice(4, -12, 24), { slice: 3, changed: true });
 });
 
-test('synthetic lesion locations are deterministic and slice-local', () => {
-  const a = syntheticLesions('SYN-014', 11, 24);
-  const b = syntheticLesions('SYN-014', 11, 24);
-  assert.deepEqual(a, b);
-  assert.ok(a.every(x => x.x >= 0 && x.x <= 1 && x.y >= 0 && x.y <= 1 && x.radius > 0));
-  assert.notDeepEqual(a, syntheticLesions('SYN-014', 2, 24));
+test('UI removes generated synthetic CT graphics and keeps real CT as a contextual dialog', () => {
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
+  const source = fs.readFileSync(new URL('../app.js', `file://${__filename}`), 'utf8');
+  assert.match(html, /id="realCtDialog"/);
+  assert.match(html, /id="openRealCt"/);
+  assert.match(html, /id="closeRealCt"/);
+  assert.doesNotMatch(html, /id="ctCanvas"/);
+  assert.doesNotMatch(source, /drawSyntheticCt|syntheticLesions|Synthetic CT/);
+  assert.match(html, /현재 선택한 합성 사례의 영상이 아닙니다/);
 });
 
 
@@ -189,12 +193,63 @@ test('CSP-compatible signal bars use progress elements instead of inline styles'
   assert.doesNotMatch(source, /style="width:/);
 });
 
-test('rendered queue and CT controls work at mobile and desktop widths', { skip: !process.env.LESIONLENS_CHROME, timeout: 60000 }, async t => {
+test('rendered queue, rationale detail, and CT reference dialog work at mobile and desktop widths', { skip: !process.env.LESIONLENS_CHROME, timeout: 60000 }, async t => {
   const { spawn } = require('node:child_process');
   const { once } = require('node:events');
   const os = require('node:os');
   const path = require('node:path');
-  const { pathToFileURL } = require('node:url');
+  const http = require('node:http');
+  const root = path.resolve(__dirname, '..');
+  const actualManifest = path.join(root, 'data', 'real_cases', 'manifest.json');
+  const useValidatedLocalAssets = fs.existsSync(actualManifest);
+  let baseUrl;
+  if (useValidatedLocalAssets) {
+    const reservation = http.createServer();
+    await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+    const port = reservation.address().port;
+    await new Promise(resolve => reservation.close(resolve));
+    const secureServer = spawn('python', ['scripts/serve_local.py', '--port', String(port)], { cwd:root, stdio:['ignore','pipe','pipe'] });
+    t.after(() => secureServer.kill());
+    await new Promise((resolve, reject) => {
+      let output = '';
+      secureServer.on('error', reject);
+      secureServer.stdout.on('data', chunk => {
+        output += chunk;
+        if (output.includes('LesionLens serving on')) resolve();
+      });
+      secureServer.on('exit', code => reject(new Error(`secure local server exited: ${code}`)));
+    });
+    baseUrl = `http://127.0.0.1:${port}`;
+    t.diagnostic('Browser test uses validated local CT assets through scripts/serve_local.py');
+  } else {
+    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    const fixtureManifest = realManifest();
+    const webServer = http.createServer((request, response) => {
+      const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
+      response.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+      if (pathname === '/' || pathname === '/index.html') {
+        response.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return response.end(fs.readFileSync(path.join(root, 'index.html')));
+      }
+      if (pathname === '/app.js' || pathname === '/styles.css') {
+        response.setHeader('Content-Type', pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8');
+        return response.end(fs.readFileSync(path.join(root, pathname.slice(1))));
+      }
+      if (pathname === '/data/real_cases/manifest.json') {
+        response.setHeader('Content-Type', 'application/json');
+        return response.end(JSON.stringify(fixtureManifest));
+      }
+      if (/^\/data\/real_cases\/web\/LL-CT-00[1-3]\/(ct|overlay)\/(0[1-9]|1[0-9]|2[0-4])\.(webp|png)$/.test(pathname)) {
+        response.setHeader('Content-Type', 'image/png');
+        return response.end(pixel);
+      }
+      response.statusCode = 404;
+      response.end('not found');
+    });
+    await new Promise(resolve => webServer.listen(0, '127.0.0.1', resolve));
+    t.after(() => webServer.close());
+    baseUrl = `http://127.0.0.1:${webServer.address().port}`;
+  }
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'lesionlens-browser-'));
   const browser = spawn(process.env.LESIONLENS_CHROME, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
@@ -242,7 +297,7 @@ test('rendered queue and CT controls work at mobile and desktop widths', { skip:
   };
   await cdp('Runtime.enable');
   await cdp('Page.enable');
-  await cdp('Page.navigate', { url: pathToFileURL(path.resolve(__dirname, '../index.html')).href });
+  await cdp('Page.navigate', { url: `${baseUrl}/?v=test` });
   await evaluate(`new Promise(resolve => {
     if (document.readyState === 'complete') resolve(true);
     else addEventListener('load', () => resolve(true), { once: true });
@@ -263,7 +318,7 @@ test('rendered queue and CT controls work at mobile and desktop widths', { skip:
   for (const item of cases) {
     await evaluate(`document.querySelector('[data-id="${item.id}"]').click()`);
     assert.equal(await evaluate(`document.querySelector('.detail-hero h2').textContent`), item.id);
-    assert.equal(await evaluate(`document.activeElement.id`), 'ctCanvas');
+    assert.equal(await evaluate(`document.activeElement.id`), 'selectedCaseTitle');
     const detail = await evaluate(`document.querySelector('#detailPanel').textContent`);
     for (const reason of item.reasons) assert.ok(detail.includes(reason));
     assert.match(detail, /확인할 항목/);
@@ -271,20 +326,37 @@ test('rendered queue and CT controls work at mobile and desktop widths', { skip:
     assert.match(detail, /확률 아님/);
     assert.match(detail, /공통 실패/);
   }
-  await evaluate(`document.querySelector('#sliceSlider').value = 7; document.querySelector('#sliceSlider').dispatchEvent(new Event('input'))`);
-  assert.equal(await evaluate(`document.querySelector('#sliceLabel').textContent`), '8 / 24');
-  await evaluate(`document.querySelector('#ctCanvas').focus()`);
-  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight' });
-  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight' });
-  assert.equal(await evaluate(`document.querySelector('#sliceSlider').value`), '8');
-  await evaluate(`document.querySelector('#ctCanvas').scrollIntoView({ block: 'center' })`);
-  const point = await evaluate(`(() => { const r = document.querySelector('#ctCanvas').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-  await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaY: 100, deltaX: 0 });
-  await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-  assert.equal(await evaluate(`document.querySelector('#sliceSlider').value`), '9');
-  await evaluate(`document.querySelector('#previousSlice').click(); document.querySelector('#nextSlice').click(); document.querySelector('#overlayToggle').click()`);
-  assert.equal(await evaluate(`document.querySelector('#sliceSlider').value`), '9');
-  assert.equal(await evaluate(`document.querySelector('#overlayToggle').getAttribute('aria-pressed')`), 'false');
+  assert.equal(await evaluate(`document.querySelectorAll('.real-case').length`), 0, 'reference assets load only after the dialog opens');
+  await evaluate(`document.querySelector('#openRealCt').focus(); document.querySelector('#openRealCt').click()`);
+  assert.equal(await evaluate(`document.querySelector('#realCtDialog').open`), true);
+  assert.match(await evaluate(`document.querySelector('#realCtDialog').textContent`), /현재 선택한 합성 사례의 영상이 아닙니다/);
+  assert.equal(await evaluate(`document.querySelector('#ctCanvas') === null`), true);
+  await evaluate(`new Promise((resolve, reject) => {
+    const done = () => document.querySelector('#realCtSection').classList.contains('loaded') && document.querySelector('#realCtImage').naturalWidth > 0;
+    if (done()) return resolve(true);
+    const started = performance.now();
+    const timer = setInterval(() => {
+      if (done()) { clearInterval(timer); resolve(true); }
+      else if (performance.now() - started > 5000) { clearInterval(timer); reject(new Error('CT fixture did not load')); }
+    }, 20);
+  })`);
+  assert.equal(await evaluate(`document.querySelectorAll('.real-case').length`), 3);
+  assert.equal(await evaluate(`document.querySelector('#realCtImage').naturalWidth`), useValidatedLocalAssets ? 512 : 1);
+  await evaluate(`document.querySelector('#realSliceSlider').value = '0'; document.querySelector('#realSliceSlider').dispatchEvent(new Event('input'))`);
+  assert.equal(await evaluate(`document.querySelector('#realPreviousSlice').disabled`), true);
+  await evaluate(`document.querySelector('#realNextSlice').click()`);
+  assert.equal(await evaluate(`document.querySelector('#realSliceSlider').value`), '1');
+  await evaluate(`document.querySelector('#realCtImage').dispatchEvent(new KeyboardEvent('keydown', { key:'ArrowRight', bubbles:true, cancelable:true }))`);
+  assert.equal(await evaluate(`document.querySelector('#realSliceSlider').value`), '2');
+  await evaluate(`document.querySelector('#realImageFrame').dispatchEvent(new WheelEvent('wheel', { deltaY:100, bubbles:true, cancelable:true }))`);
+  assert.equal(await evaluate(`document.querySelector('#realSliceSlider').value`), '3');
+  await evaluate(`document.querySelector('#realOverlayToggle').click()`);
+  assert.equal(await evaluate(`document.querySelector('#realOverlayToggle').getAttribute('aria-pressed')`), 'false');
+  await evaluate(`document.querySelector('#realSliceSlider').value = '23'; document.querySelector('#realSliceSlider').dispatchEvent(new Event('input'))`);
+  assert.equal(await evaluate(`document.querySelector('#realNextSlice').disabled`), true);
+  await evaluate(`document.querySelector('#closeRealCt').click()`);
+  assert.equal(await evaluate(`document.querySelector('#realCtDialog').open`), false);
+  assert.equal(await evaluate(`document.activeElement.id`), 'openRealCt');
   for (const width of [390, 800, 1280, 1440]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     await evaluate(`scrollTo(0, 0); new Promise(resolve => requestAnimationFrame(resolve))`);
@@ -294,7 +366,7 @@ test('rendered queue and CT controls work at mobile and desktop widths', { skip:
       fs.writeFileSync(file, Buffer.from(screenshot.data, 'base64'));
       t.diagnostic(`Screenshot: ${file}`);
     }
-    const overflow = await evaluate(`Array.from(document.querySelectorAll('main, .workspace, .queue-panel, .case, .detail-panel, .ct-viewer, .section-head')).filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.className || el.tagName)`);
+    const overflow = await evaluate(`Array.from(document.querySelectorAll('main, .workspace, .queue-panel, .case, .detail-panel, .section-head')).filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.className || el.tagName)`);
     assert.deepEqual(overflow, [], `Overflow at ${width}px`);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `Page overflow at ${width}px`);
     assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.reason-tag')).whiteSpace`), 'nowrap', `Reasons must wrap at ${width}px`);
@@ -302,7 +374,7 @@ test('rendered queue and CT controls work at mobile and desktop widths', { skip:
     const cardPoint = await evaluate(`(() => { const r = document.querySelector('.case').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', ...cardPoint, button: 'left', clickCount: 1 });
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', ...cardPoint, button: 'left', clickCount: 1 });
-    assert.equal(await evaluate(`(() => { const r = document.querySelector('#ctCanvas').getBoundingClientRect(); return r.top >= 76 && r.bottom <= innerHeight; })()`), true, `CT open brings viewer into view at ${width}px`);
+    assert.equal(await evaluate(`(() => { const r = document.querySelector('#selectedCaseTitle').getBoundingClientRect(); return r.top >= 76 && r.top <= innerHeight; })()`), true, `Rationale detail comes into view at ${width}px`);
   }
   assert.deepEqual(errors, []);
 

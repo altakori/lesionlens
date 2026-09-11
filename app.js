@@ -71,7 +71,7 @@
 
   function caseButtonHtml(item, rank, selectedId) {
     const [kind, label] = statusLabel(item);
-    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><small class="reason-tag">${escapeHtml(item.reasons[0])}</small><span class="viewer-cta">CT 열기 <b aria-hidden="true">→</b></span></span><span class="score"><strong>${Number(item.score)}</strong><small>추가 확인 가치<br>합성 신호<br>확률 아님</small></span></button>`;
+    return `<button class="case ${item.id === selectedId ? 'selected' : ''}" data-id="${escapeHtml(item.id)}" aria-pressed="${item.id === selectedId}"><span class="rank">${String(rank + 1).padStart(2, '0')}</span><span class="case-main"><strong>${escapeHtml(item.id)}</strong><span class="badge ${escapeHtml(kind)}">${escapeHtml(label)}</span><small class="reason-tag">${escapeHtml(item.reasons[0])}</small><span class="viewer-cta">검토 근거 보기 <b aria-hidden="true">→</b></span></span><span class="score"><strong>${Number(item.score)}</strong><small>추가 확인 가치<br>합성 신호<br>확률 아님</small></span></button>`;
   }
 
   function clampSlice(value, totalSlices) {
@@ -90,28 +90,6 @@
     return { slice, changed: slice !== current };
   }
 
-  function hashSeed(text) {
-    let hash = 2166136261;
-    for (const char of String(text)) {
-      hash ^= char.charCodeAt(0);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-
-  function syntheticLesions(caseId, slice, totalSlices) {
-    const total = Math.max(1, Number(totalSlices) || 1);
-    const seed = hashSeed(caseId);
-    const center = Math.floor(total * (0.38 + (seed % 22) / 100));
-    const distance = Math.abs(Number(slice) - center);
-    if (distance > 3) return [];
-    const radius = Math.max(0.018, (0.055 + ((seed >>> 8) % 18) / 1000) * (1 - distance / 5));
-    return [{
-      x: 0.61 + ((seed >>> 12) % 17) / 100,
-      y: 0.48 + ((seed >>> 17) % 16) / 100,
-      radius: Number(radius.toFixed(3))
-    }];
-  }
 
   function normalizeRealManifest(manifest) {
     const expectedIds = ['LL-CT-001', 'LL-CT-002', 'LL-CT-003'];
@@ -132,7 +110,7 @@
         if (!row || row.index !== number || row.ct !== expectedCt || row.overlay !== expectedOverlay || !Number.isInteger(row.sourceSlice) || row.sourceSlice < 0 || row.width !== 512 || row.height !== 512 || !validHash(row.ctSha256) || !validHash(row.overlaySha256) || !Number.isInteger(row.tumorPixels) || row.tumorPixels < 0) return [];
         slices.push({ index: number, sourceSlice: row.sourceSlice, width: row.width, height: row.height, ct: expectedCt, overlay: expectedOverlay, ctSha256: row.ctSha256, overlaySha256: row.overlaySha256, tumorPixels: row.tumorPixels });
       }
-      normalized.push({ id, label: String(item.label || '공개 CT 샘플'), slices });
+      normalized.push({ id, label: String(item.label || '로컬 LiTS CT 샘플'), slices });
     }
     return normalized;
   }
@@ -162,6 +140,8 @@
       const description = doc.getElementById('realCtDescription');
       const overlayToggle = doc.getElementById('realOverlayToggle');
       const imageFrame = doc.getElementById('realImageFrame');
+      const previousButton = doc.getElementById('realPreviousSlice');
+      const nextButton = doc.getElementById('realNextSlice');
       let selected = 0;
       let slice = 0;
       let showOverlay = true;
@@ -200,12 +180,14 @@
         overlay.hidden = !showOverlay;
         slider.max = String(item.slices.length - 1);
         slider.value = String(slice);
+        previousButton.disabled = slice === 0;
+        nextButton.disabled = slice === item.slices.length - 1;
         const valueText = sliceValueText(slice, item.slices.length);
         slider.setAttribute('aria-valuetext', valueText);
         label.textContent = valueText;
-        image.alt = `${item.id} 실제 공개 CT 축상 절편 ${valueText}`;
+        image.alt = `${item.id} 로컬 LiTS CT 축상 절편 ${valueText}`;
         overlay.alt = `${item.id} LiTS 종양 정답 주석 ${valueText}`;
-        description.textContent = `${item.id}, 실제 공개 CT 절편 ${valueText}. LiTS 종양 정답 주석 ${showOverlay ? '표시 중' : '숨김'}. AI 예측이나 진단 결과가 아닙니다.`;
+        description.textContent = `${item.id}, 로컬 LiTS CT 절편 ${valueText}. LiTS 종양 정답 주석 ${showOverlay ? '표시 중' : '숨김'}. AI 예측이나 진단 결과가 아닙니다.`;
       };
 
       const renderCases = () => {
@@ -234,8 +216,8 @@
       };
 
       slider.addEventListener('input', () => renderSlice(slider.value));
-      doc.getElementById('realPreviousSlice').addEventListener('click', () => renderSlice(slice - 1));
-      doc.getElementById('realNextSlice').addEventListener('click', () => renderSlice(slice + 1));
+      previousButton.addEventListener('click', () => renderSlice(slice - 1));
+      nextButton.addEventListener('click', () => renderSlice(slice + 1));
       overlayToggle.addEventListener('click', () => {
         showOverlay = !showOverlay;
         overlayToggle.setAttribute('aria-pressed', String(showOverlay));
@@ -264,174 +246,61 @@
     }
   }
 
-  function drawSyntheticCt(canvas, item, slice, totalSlices, showOverlay) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return false;
-    const size = canvas.width;
-    const seed = hashSeed(`${item.id}:${slice}`);
-    ctx.fillStyle = '#05070b';
-    ctx.fillRect(0, 0, size, size);
-
-    const cx = size / 2;
-    const cy = size / 2 + 5;
-    const bodyWidth = size * (0.36 + Math.sin((slice / totalSlices) * Math.PI) * 0.05);
-    const bodyHeight = size * 0.40;
-    const body = ctx.createRadialGradient(cx - 18, cy - 25, 20, cx, cy, bodyWidth);
-    body.addColorStop(0, '#b7b9bc');
-    body.addColorStop(0.58, '#73777d');
-    body.addColorStop(1, '#252a30');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, bodyWidth, bodyHeight, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#161a20';
-    ctx.beginPath();
-    ctx.ellipse(cx - size * .13, cy - size * .09, size * .105, size * .15, -.08, 0, Math.PI * 2);
-    ctx.ellipse(cx + size * .13, cy - size * .09, size * .105, size * .15, .08, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#92959a';
-    ctx.beginPath();
-    ctx.ellipse(cx + size * .13, cy + size * .07, size * .19, size * .13, -.12, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#e4e5e7';
-    ctx.beginPath();
-    ctx.arc(cx, cy + size * .24, size * .047, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#4d5259';
-    ctx.beginPath();
-    ctx.arc(cx, cy + size * .24, size * .018, 0, Math.PI * 2);
-    ctx.fill();
-
-    let state = seed || 1;
-    for (let i = 0; i < 230; i += 1) {
-      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-      const angle = (state % 6283) / 1000;
-      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-      const distance = Math.sqrt((state % 1000) / 1000);
-      const x = cx + Math.cos(angle) * bodyWidth * distance;
-      const y = cy + Math.sin(angle) * bodyHeight * distance;
-      ctx.fillStyle = `rgba(255,255,255,${0.025 + (state % 5) / 100})`;
-      ctx.fillRect(x, y, 1.4, 1.4);
-    }
-
-    syntheticLesions(item.id, slice, totalSlices).forEach(lesion => {
-      const x = lesion.x * size;
-      const y = lesion.y * size;
-      const r = lesion.radius * size;
-      ctx.fillStyle = 'rgba(45,48,52,.8)';
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-      if (showOverlay) {
-        ctx.strokeStyle = '#ff5d9e';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.arc(x, y, r + 6, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    });
-
-    ctx.fillStyle = 'rgba(0,0,0,.62)';
-    ctx.fillRect(12, 12, 128, 42);
-    ctx.fillStyle = '#f5f7fa';
-    ctx.font = '600 13px system-ui';
-    ctx.fillText(`AXIAL  ${String(slice + 1).padStart(2, '0')}/${totalSlices}`, 22, 31);
-    ctx.font = '11px system-ui';
-    ctx.fillStyle = '#bfc5cf';
-    ctx.fillText('Synthetic CT · no PHI', 22, 47);
-    return true;
-  }
-
   function mount(doc) {
     const list = doc.getElementById('caseList');
     const detail = doc.getElementById('detailPanel');
     const sortSelect = doc.getElementById('sortSelect');
+    const realCtDialog = doc.getElementById('realCtDialog');
     let filter = 'all';
     let selectedId = cases[0].id;
-    let selectedSlice = 11;
-    let showOverlay = true;
-    let focusViewerAfterRender = false;
-    const totalSlices = 24;
+    let focusDetailAfterRender = false;
+    let realCtLoaded = false;
+    let realCtOpener = null;
+
+    function openRealCt() {
+      if (typeof realCtDialog.showModal !== 'function') {
+        const status = doc.getElementById('realDataStatus');
+        status.textContent = '이 브라우저는 CT 참고 대화상자를 지원하지 않습니다';
+        status.classList.add('error');
+        return;
+      }
+      realCtOpener = doc.activeElement;
+      realCtDialog.showModal();
+      if (!realCtLoaded) {
+        realCtLoaded = true;
+        mountRealCases(doc);
+      }
+    }
+
+    function closeRealCt() {
+      if (realCtDialog.open) realCtDialog.close();
+      if (realCtOpener && typeof realCtOpener.focus === 'function') realCtOpener.focus();
+    }
 
     function renderDetail(item) {
       const [, label] = statusLabel(item);
       detail.innerHTML = `
-        <div class="detail-hero"><small>${escapeHtml(label)}</small><h2>${escapeHtml(item.id)}</h2><p>추가 확인 가치 · ${Number(item.score)}</p><p class="signal-note">합성 신호 · 진단 확률 아님</p></div>
+        <div class="detail-hero"><small>${escapeHtml(label)}</small><h2 id="selectedCaseTitle" tabindex="-1">${escapeHtml(item.id)}</h2><p>추가 확인 가치 · ${Number(item.score)}</p><p class="signal-note">합성 신호 · 진단 확률 아님</p></div>
         <div class="detail-body">
-          <section class="ct-viewer" aria-label="${escapeHtml(item.id)} 합성 CT 뷰어">
-            <div class="ct-toolbar">
-              <div><strong>Axial CT</strong><span>합성 영상 · 실제 환자자료 아님</span></div>
-              <button id="overlayToggle" type="button" aria-pressed="${showOverlay}">${showOverlay ? '후보 표시 숨기기' : '후보 표시'}</button>
-            </div>
-            <canvas id="ctCanvas" width="420" height="420" tabindex="0" aria-label="마우스 휠 또는 아래 슬라이더로 절편 이동">합성 축상 CT 뷰어입니다. 아래 절편 설명을 확인하세요.</canvas>
-            <p id="ctDescription" class="ct-description" aria-live="polite"></p>
-            <div class="slice-control">
-              <button id="previousSlice" type="button" aria-label="이전 절편">−</button>
-              <label>절편 <strong id="sliceLabel">${selectedSlice + 1} / ${totalSlices}</strong>
-                <input id="sliceSlider" type="range" min="0" max="${totalSlices - 1}" value="${selectedSlice}" aria-label="CT 절편" aria-valuetext="${sliceValueText(selectedSlice, totalSlices)}">
-              </label>
-              <button id="nextSlice" type="button" aria-label="다음 절편">＋</button>
-            </div>
-          </section>
+          <div class="detail-purpose"><strong>이 화면에서 할 일</strong><p>선정 이유와 확인 항목을 읽고 기존 판독·QA 흐름에서 무엇을 먼저 다시 볼지 결정합니다.</p></div>
           <h3>사례별 검토 근거</h3>
           <ul class="reason-list">${item.reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>
           <h3>확인할 항목</h3>
-          <p class="inspect-note">${item.status === 'quality' ? '절편 간격과 영상 품질 플래그를 먼저 확인하고 모델 표시를 비교하세요.' : item.status === 'priority' ? '절편을 이동하며 모델 표시 차이와 작은 후보·경계 인접 위치를 비교하세요.' : '전체 절편과 모델 표시를 일반 순서로 검토하세요. 낮은 신호만으로 검토를 생략하지 않습니다.'}</p>
+          <p class="inspect-note">${item.status === 'quality' ? '실제 적용 단계에서는 해당 사례의 원본 영상에서 절편 간격과 영상 품질 플래그를 먼저 확인한 뒤 모델 결과를 해석합니다.' : item.status === 'priority' ? '실제 적용 단계에서는 해당 사례의 원본 영상에서 모델 표시 차이와 작은 후보·경계 인접 위치를 비교합니다. 현재 합성 사례에는 원본 영상이 연결되어 있지 않습니다.' : '실제 적용 단계에서는 해당 사례의 전체 원본 절편과 모델 표시를 일반 순서로 검토합니다. 현재 합성 사례에는 원본 영상이 연결되어 있지 않으며 낮은 신호만으로 검토를 생략하지 않습니다.'}</p>
           <h3>신호 구성</h3>
-          <p class="signal-note">모든 수치는 합성 데모 신호이며 진단 확률 아님.</p>
+          <p class="signal-note">모든 수치는 합성 데모 신호이며 진단 확률이 아닙니다.</p>
           <div class="model-bars">
             ${[['모델 불일치',item.disagreement,''],['작은 병변 후보',item.smallCandidate,'pink'],['영상 품질',item.quality,'']].map(([name,value,cls]) => `<div><div class="bar-label"><span>${escapeHtml(name)}</span><strong>${Number(value)}</strong></div><progress class="bar ${escapeHtml(cls)}" max="100" value="${Math.max(0, Math.min(100, Number(value)))}" aria-label="${escapeHtml(name)} ${Math.max(0, Math.min(100, Number(value)))}"></progress></div>`).join('')}
           </div>
-          <div class="limitation"><strong>해석 한계</strong><br>합성 영상·신호로 실제 성능을 입증하지 않습니다. 후보는 오탐일 수 있고 품질 신호는 질환 위험과 별개입니다. 두 모델의 공통 실패는 낮은 점수로 배제할 수 없으며 일반 순서는 정상 판정이 아닙니다. 최종 판단은 의료진이 수행합니다.</div>
+          <div class="limitation"><strong>해석 한계</strong><br>합성 사례·신호로 실제 성능을 입증하지 않습니다. 후보는 오탐일 수 있고 품질 신호는 질환 위험과 별개입니다. 두 모델의 공통 실패는 낮은 점수로 배제할 수 없으며 일반 순서는 정상 판정이 아닙니다. 최종 판단은 의료진이 수행합니다.</div>
+          <div class="reference-callout"><div><strong>실제 CT 조작을 확인해야 하나요?</strong><p>현재 합성 사례와 연결되지 않은 로컬 LiTS CT 참고 영상을 대화상자에서 볼 수 있습니다.</p></div><button class="open-real-ct-inline" type="button">실제 CT 샘플 보기</button></div>
         </div>`;
-
-      const canvas = doc.getElementById('ctCanvas');
-      const slider = doc.getElementById('sliceSlider');
-      const sliceLabel = doc.getElementById('sliceLabel');
-      const description = doc.getElementById('ctDescription');
-      const refreshSlice = value => {
-        selectedSlice = clampSlice(value, totalSlices);
-        slider.value = selectedSlice;
-        const valueText = sliceValueText(selectedSlice, totalSlices);
-        const lesionCount = syntheticLesions(item.id, selectedSlice, totalSlices).length;
-        sliceLabel.textContent = valueText;
-        slider.setAttribute('aria-valuetext', valueText);
-        description.textContent = `${item.id}, 축상 절편 ${valueText}. 병변 후보 ${lesionCount}개. 후보 표시 ${showOverlay ? '켜짐' : '꺼짐'}. 합성 영상이며 실제 환자자료가 아닙니다.`;
-        if (!drawSyntheticCt(canvas, item, selectedSlice, totalSlices, showOverlay)) {
-          description.textContent += ' 이 브라우저에서는 캔버스 영상을 표시할 수 없습니다.';
-        }
-      };
-      slider.addEventListener('input', () => refreshSlice(slider.value));
-      doc.getElementById('previousSlice').addEventListener('click', () => refreshSlice(selectedSlice - 1));
-      doc.getElementById('nextSlice').addEventListener('click', () => refreshSlice(selectedSlice + 1));
-      doc.getElementById('overlayToggle').addEventListener('click', event => {
-        showOverlay = !showOverlay;
-        event.currentTarget.setAttribute('aria-pressed', String(showOverlay));
-        event.currentTarget.textContent = showOverlay ? '후보 표시 숨기기' : '후보 표시';
-        refreshSlice(selectedSlice);
-      });
-      canvas.addEventListener('wheel', event => {
-        const next = wheelSlice(selectedSlice, event.deltaY, totalSlices);
-        if (!next.changed) return;
-        event.preventDefault();
-        refreshSlice(next.slice);
-      }, { passive: false });
-      canvas.addEventListener('keydown', event => {
-        if (!['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'].includes(event.key)) return;
-        event.preventDefault();
-        if (event.key === 'ArrowUp' || event.key === 'ArrowRight') refreshSlice(selectedSlice + 1);
-        else refreshSlice(selectedSlice - 1);
-      });
-      refreshSlice(selectedSlice);
-      if (focusViewerAfterRender) {
-        focusViewerAfterRender = false;
-        canvas.focus({ preventScroll: true });
-        canvas.scrollIntoView({ block: 'center', behavior: 'instant' });
+      detail.querySelector('.open-real-ct-inline').addEventListener('click', openRealCt);
+      if (focusDetailAfterRender) {
+        focusDetailAfterRender = false;
+        const title = doc.getElementById('selectedCaseTitle');
+        title.focus({ preventScroll: true });
+        detail.scrollIntoView({ block: 'start', behavior: 'instant' });
       }
     }
 
@@ -444,7 +313,6 @@
       doc.getElementById('viewCount').textContent = `${visible.length} / ${cases.length} 사례 표시`;
       const selected = visibleSelection(visible, selectedId);
       if (selected) selectedId = selected.id;
-      // HTML templates only receive source-controlled demo data; every interpolated string is escaped.
       list.innerHTML = visible.map(item => {
         const rank = ranked.findIndex(c => c.id === item.id);
         return caseButtonHtml(item, rank, selectedId);
@@ -452,8 +320,7 @@
       if (selected) renderDetail(selected);
       list.querySelectorAll('.case').forEach(button => button.addEventListener('click', () => {
         selectedId = button.dataset.id;
-        selectedSlice = 11;
-        focusViewerAfterRender = true;
+        focusDetailAfterRender = true;
         render();
       }));
     }
@@ -469,9 +336,13 @@
       filter = button.dataset.filter;
       render();
     }));
+    doc.getElementById('openRealCt').addEventListener('click', openRealCt);
+    doc.getElementById('closeRealCt').addEventListener('click', closeRealCt);
+    realCtDialog.addEventListener('click', event => {
+      if (event.target === realCtDialog) closeRealCt();
+    });
     render();
-    mountRealCases(doc);
   }
 
-  return { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, syntheticLesions, normalizeRealManifest, mountRealCases, mount };
+  return { cases, priorityCount, queueSummary, filteredCases, sortedCases, visibleSelection, statusLabel, escapeHtml, caseButtonHtml, clampSlice, sliceValueText, wheelSlice, normalizeRealManifest, mountRealCases, mount };
 });

@@ -8,7 +8,7 @@ Revise the static LesionLens MVP so a first-time non-developer can understand wi
 2. what “review priority” means;
 3. why each case is ranked;
 4. that every case remains in the queue;
-5. that queue cases, scores, and synthetic-viewer signals are research-demo values rather than clinical probabilities, while the separate local viewer uses public non-PHI LiTS CT with dataset GT.
+5. that queue cases, scores, and synthetic workflow signals are research-demo values rather than clinical probabilities, while the separate local viewer uses locally prepared LiTS CT with dataset GT.
 
 ## Product decisions that must remain true
 
@@ -18,8 +18,8 @@ Revise the static LesionLens MVP so a first-time non-developer can understand wi
 - View filters are navigation aids only, never safety or diagnosis decisions.
 - `먼저 확인`, `품질 확인`, `일반 순서` are workflow labels, not clinical urgency.
 - Do not introduce urgency, metastasis, survival, curability, diagnosis, or treatment claims.
-- Preserve the boundary between the synthetic prioritization queue/viewer and the separate local public non-PHI LiTS CT/GT viewer. LiTS GT is dataset annotation, not an AI output or diagnosis.
-- Preserve both working CT viewers and their keyboard/wheel navigation.
+- Keep the CT reference in a contextual dialog using three locally prepared LiTS CT/GT cases. State that dataset GT is not AI output or a diagnosis, is unrelated to the selected synthetic case, and needs provenance/license/de-identification confirmation before external distribution.
+- Do not render a generated synthetic CT. Preserve keyboard/wheel navigation only for the separately labeled public CT/GT reference dialog.
 - Preserve the internal top-10/20/30 evaluation helpers if useful for research testing, but do not present them as the primary user queue control.
 
 ## Required interface changes
@@ -48,7 +48,7 @@ Revise the static LesionLens MVP so a first-time non-developer can understand wi
 ### Case cards and detail
 
 - Each card shows a clear text status label and at least one concrete reason tag.
-- Keep `CT 열기` as an obvious text action.
+- Use `검토 근거 보기` for synthetic queue cards; reserve CT wording for the separate public CT reference.
 - Signal numbers may remain only with nearby wording that they are synthetic signals, not probabilities.
 - The selected detail shows the reason, what to inspect, and a concise limitation.
 
@@ -71,6 +71,6 @@ Add a compact section explaining:
 - `npm test` passes.
 - Static HTML contains `id="sortSelect"` and does not contain `id="workloadSelect"`.
 - Queue copy explicitly states all cases remain and filters do not mean safety.
-- Browser smoke at desktop and mobile widths: no horizontal overflow; queue selection, filters, sorting, `CT 열기`, slice slider, keyboard/wheel viewer continue to work.
+- Browser smoke at desktop and mobile widths: no horizontal overflow; queue selection, filters, sorting, rationale detail, and the public CT dialog's slice/keyboard/wheel controls continue to work.
 - Browser console has no runtime errors.
 - Only `index.html`, `app.js`, `styles.css`, and `tests/app.test.js` may be changed by the implementation worker.
