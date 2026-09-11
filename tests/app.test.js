@@ -27,7 +27,7 @@ test('queue sort keeps every case and supports review, quality, and id order', (
   assert.equal(review.length, cases.length);
   assert.equal(quality.length, cases.length);
   assert.equal(byId.length, cases.length);
-  assert.deepEqual(review.map(c => c.id), cases.map(c => c.id));
+  assert.deepEqual(review.map(c => c.id), ['SYN-008','SYN-014','SYN-021','SYN-003','SYN-026','SYN-011','SYN-017','SYN-005','SYN-002','SYN-019']);
   assert.equal(quality[0].id, 'SYN-003');
   assert.equal(byId[0].id, 'SYN-002');
   for (const result of [review, quality, byId]) {
@@ -37,7 +37,7 @@ test('queue sort keeps every case and supports review, quality, and id order', (
   assert.deepEqual(sortedCases([...cases].reverse()), review);
   assert.deepEqual(sortedCases(cases, 'unknown'), review);
   assert.deepEqual(sortedCases([], 'id'), []);
-  assert.ok(quality.every((item, i) => !i || quality[i - 1].quality >= item.quality));
+  assert.deepEqual(quality.slice(0, 2).map(c => c.status), ['quality', 'quality']);
   assert.deepEqual(byId.map(c => c.id), cases.map(c => c.id).sort());
 });
 
@@ -78,15 +78,36 @@ test('case card opens review rationale without claiming a synthetic CT', () => {
   assert.doesNotMatch(html, /CT 열기/);
   assert.doesNotMatch(html, /aria-label="SYN-014 CT 열기"/);
   assert.match(html, /SYN-014/);
-  assert.match(html, /모델 간 종양 마스크 차이 34%/);
+  assert.match(html, /모델 간 종양 마스크 차이가 큼/);
+  assert.match(html, /작은 후보가 여러 개 관찰됨/);
+  assert.match(html, /근거 3개/);
+  assert.doesNotMatch(html, /<span class="score">/);
   assert.match(html, /aria-pressed="true"/);
   for (const item of cases) {
     const card = caseButtonHtml(item, 0, cases[0].id);
     assert.ok(card.includes(escapeHtml(item.reasons[0])));
-    assert.match(card, /합성 신호/);
-    assert.match(card, /확률 아님/);
+    assert.ok(card.includes(escapeHtml(item.reasons[1])));
     assert.ok(card.includes(statusLabel(item)[1]));
   }
+});
+
+test('raw mentoring feedback is represented by explicit product context and evidence boundaries', () => {
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
+  for (const id of ['project-context', 'workflow-purpose', 'case-map', 'evidence-boundary']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(html, /영상의학과 의료진/);
+  assert.match(html, /QA 담당자/);
+  assert.match(html, /모든 사례를 유지/);
+  assert.match(html, /원래 판독·QA 흐름/);
+  assert.match(html, /한 모델만 표시한 작은 후보/);
+  assert.match(html, /간 경계 인접 후보/);
+  assert.match(html, /현재 범위 밖/);
+  assert.match(html, /기관별 재학습/);
+  assert.match(html, /심사 기준/);
+  assert.match(html, /styles\.css\?v=mentoring-raw-2/);
+  assert.match(html, /app\.js\?v=mentoring-raw-2/);
+  assert.ok(html.indexOf('id="queue"') < html.indexOf('id="project-context"'));
 });
 
 test('slice navigation clamps to the reference CT series bounds', () => {
@@ -187,10 +208,32 @@ test('real manifest rejects wrong version, non-local, alias mismatch, and non-se
   assert.deepEqual(normalizeRealManifest(badHash), []);
 });
 
-test('CSP-compatible signal bars use progress elements instead of inline styles', () => {
+test('unvalidated synthetic signal numbers are not rendered', () => {
   const source = fs.readFileSync(new URL('../app.js', `file://${__filename}`), 'utf8');
-  assert.match(source, /<progress class="bar/);
+  assert.doesNotMatch(source, /<progress class="bar/);
   assert.doesNotMatch(source, /style="width:/);
+  assert.match(source, /상대 신호가 관찰됨/);
+  assert.doesNotMatch(source, /추가 확인 가치 · \$\{Number\(item\.score\)\}/);
+});
+
+test('evaluation section is a pending plan rather than a completed frozen result', () => {
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
+  assert.match(html, /평가 계획 · 아직 성능 결과 없음/);
+  assert.doesNotMatch(html, /Frozen MVP contract/);
+  assert.match(html, /대표 라벨은 다음 행동/);
+});
+
+test('provisional users and observed signals are represented without stale score wording', () => {
+  const html = fs.readFileSync(new URL('../index.html', `file://${__filename}`), 'utf8');
+  const source = fs.readFileSync(new URL('../app.js', `file://${__filename}`), 'utf8');
+  assert.match(html, /현재 사용자 가정/);
+  assert.match(html, /의료진 검토 필요/);
+  assert.match(source, /item\.signals/);
+  assert.match(source, /현재 별도 트리거 없음/);
+  assert.doesNotMatch(source, /점수는 정상 판정이 아님/);
+  assert.doesNotMatch(source, /낮은 점수로 배제/);
+  assert.doesNotMatch(source, /score:/);
+  assert.match(source, /선택이 \$\{selected\.id\}로 변경됨/);
 });
 
 test('rendered queue, rationale detail, and CT reference dialog work at mobile and desktop widths', { skip: !process.env.LESIONLENS_CHROME, timeout: 60000 }, async t => {
@@ -303,15 +346,17 @@ test('rendered queue, rationale detail, and CT reference dialog work at mobile a
     else addEventListener('load', () => resolve(true), { once: true });
   })`);
   const ids = () => evaluate(`Array.from(document.querySelectorAll('.case'), x => x.dataset.id)`);
-  assert.deepEqual(await ids(), cases.map(c => c.id));
+  assert.deepEqual(await ids(), sortedCases(cases, 'review').map(c => c.id));
   assert.equal(await evaluate('document.querySelector("#sortSelect").value'), 'review');
+  assert.equal(await evaluate(`document.querySelector('.case[aria-pressed="true"]').dataset.id`), sortedCases(cases, 'review')[0].id);
+  assert.equal(await evaluate(`document.querySelector('.detail-hero h2').textContent`), sortedCases(cases, 'review')[0].id);
   for (const sort of ['quality', 'id', 'review']) {
     await evaluate(`document.querySelector('#sortSelect').value = '${sort}'; document.querySelector('#sortSelect').dispatchEvent(new Event('change'))`);
     assert.deepEqual(await ids(), sortedCases(cases, sort).map(c => c.id));
   }
   for (const filter of ['quality', 'priority', 'all']) {
     await evaluate(`document.querySelector('[data-filter="${filter}"]').click()`);
-    assert.deepEqual(await ids(), filteredCases(cases, filter).map(c => c.id));
+    assert.deepEqual(await ids(), filteredCases(sortedCases(cases, 'review'), filter).map(c => c.id));
     assert.equal(await evaluate(`document.querySelector('.case[aria-pressed="true"]').dataset.id === document.querySelector('.detail-hero h2').textContent`), true);
     assert.equal(await evaluate(`document.querySelector('#visibleCount').textContent`), '10');
   }
