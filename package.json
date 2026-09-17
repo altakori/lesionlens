@@ -1,9 +1,13 @@
 {
-  "name": "lesionlens-mvp",
-  "version": "0.1.0",
+  "name": "lesionlens",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local research dashboard with approved LiTS CT samples and a synthetic review-priority queue",
+  "description": "Local matched LiTS CT review workspace with measured GT metadata",
   "scripts": {
-    "test": "node --test tests/*.test.js && uv run --with nibabel --with pillow python -m unittest discover -s tests -p \"test_*.py\""
+    "test": "npm run test:unit && npm run test:python",
+    "test:unit": "node --test tests/*.test.js",
+    "test:python": "uv run --with nibabel --with pillow --with scipy python -m unittest discover -s tests -p \"test_*.py\"",
+    "test:browser": "uv run --with playwright python tests/browser_capp_cases.py",
+    "serve": "python scripts/serve_local.py"
   }
 }

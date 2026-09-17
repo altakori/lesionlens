@@ -1,110 +1,22 @@
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="LesionLens 합성 데이터 기반 재검토 우선순위 대시보드">
-  <title>LesionLens · Review priority</title>
-  <link rel="stylesheet" href="styles.css?v=real-ct-3">
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="LesionLens — AI가 다르게 표시한 CT를 찾아, 의료진이 다시 확인할 수 있도록 도와요."><title>LesionLens · 한 번 더 살펴보기</title><link rel="stylesheet" href="styles.css?v=review-groups-10"></head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="#queue" aria-label="LesionLens 홈">
-      <span class="brand-mark" aria-hidden="true">L</span>
-      <span><strong>LesionLens</strong><small>review priority workspace</small></span>
-    </a>
-    <div class="status"><span></span> Local research demo · no PHI</div>
-  </header>
-
-  <main>
-    <section class="hero" aria-labelledby="page-title">
-      <div>
-        <p class="eyebrow">Human-in-the-loop quality review</p>
-        <h1 id="page-title">놓칠 가능성이 큰 검사를<br><em>먼저 다시 봅니다.</em></h1>
-        <p class="hero-copy">두 분할 모델의 불일치와 작은 병변 후보, 영상 품질 신호를 한 대기열에서 설명합니다. 점수는 진단 확률이 아닌 추가 확인 가치입니다.</p>
-      </div>
-      <aside class="safety-card">
-        <span class="safety-icon">!</span>
-        <div><strong>의료진 판단 보조용 연구 데모</strong><p>공개 비식별 LiTS CT와 합성 대기열을 사용하며 진단·치료 권고를 생성하지 않습니다.</p></div>
-      </aside>
-    </section>
-
-    <section class="real-ct-section" id="realCtSection" aria-labelledby="real-ct-title">
-      <div class="real-section-head">
-        <div>
-          <p class="eyebrow">Local real CT sample</p>
-          <h2 id="real-ct-title">AI0에서 가져온 실제 공개 CT 3건</h2>
-          <p>LiTS 학습 세트의 비식별 CT에서 종양 주석을 가장 많이 포함하는 연속 24개 절편을 선택했습니다. 분홍 표시는 <strong>종양 정답 주석(GT)</strong>이며 AI 예측이나 진단 결과가 아닙니다.</p>
-        </div>
-        <span class="real-status" id="realDataStatus" role="status" aria-live="polite">로컬 데이터 확인 중</span>
-      </div>
-      <p id="realCtUnavailable" class="real-unavailable" hidden>이 로컬 PC에 실제 CT 파일이 없어서 합성 데모만 표시합니다.</p>
-      <div class="real-ct-grid">
-        <div id="realCaseList" class="real-case-list" aria-label="실제 공개 CT 사례"></div>
-        <section class="real-viewer" aria-label="실제 공개 CT 뷰어">
-          <div class="real-toolbar"><strong>Axial CT · public LiTS</strong><button id="realOverlayToggle" type="button" aria-pressed="true">GT 주석 숨기기</button></div>
-          <div class="real-image-frame" id="realImageFrame">
-            <img id="realCtImage" tabindex="0" alt="실제 공개 CT 불러오는 중">
-            <img id="realOverlayImage" alt="LiTS 종양 정답 주석">
-          </div>
-          <p id="realCtDescription" class="ct-description" aria-live="polite"></p>
-          <div class="slice-control">
-            <button id="realPreviousSlice" type="button" aria-label="이전 실제 CT 절편">−</button>
-            <label>절편 <strong id="realSliceLabel">- / -</strong>
-              <input id="realSliceSlider" type="range" min="0" max="23" value="0" aria-label="실제 CT 절편">
-            </label>
-            <button id="realNextSlice" type="button" aria-label="다음 실제 CT 절편">＋</button>
-          </div>
-        </section>
-      </div>
-    </section>
-
-    <section class="metrics" aria-label="합성 대기열 요약">
-      <article><span>검토 대상</span><strong id="visibleCount">0</strong><small>synthetic cases</small></article>
-      <article><span>우선 재검토</span><strong id="priorityCount">0</strong><small>selected workload</small></article>
-      <article><span>FN 부담 포착</span><strong id="captureRate">0%</strong><small>demo ground truth</small></article>
-      <article><span>품질 확인</span><strong id="qualityCount">0</strong><small>quality flags</small></article>
-    </section>
-
-    <section class="workspace" id="queue">
-      <div class="queue-panel">
-        <div class="section-head">
-          <div><p class="eyebrow">Review queue</p><h2>재검토 대기열</h2></div>
-          <label class="workload">검토량
-            <select id="workloadSelect" aria-label="재검토 비율">
-              <option value="10">상위 10%</option>
-              <option value="20" selected>상위 20%</option>
-              <option value="30">상위 30%</option>
-            </select>
-          </label>
-        </div>
-        <div class="filters" role="group" aria-label="대기열 필터">
-          <button class="filter active" data-filter="all" aria-pressed="true">전체</button>
-          <button class="filter" data-filter="priority" aria-pressed="false">우선 재검토</button>
-          <button class="filter" data-filter="quality" aria-pressed="false">품질 확인</button>
-        </div>
-        <p class="queue-hint">아래 사례의 <strong>CT 열기</strong>를 눌러 합성 CT를 확인하세요.</p>
-        <div id="caseList" class="case-list" aria-live="polite"></div>
-      </div>
-
-      <aside class="detail-panel" id="detailPanel" aria-live="polite">
-        <div class="empty-state">대기열에서 사례를 선택하세요.</div>
-      </aside>
-    </section>
-
-    <section class="method">
-      <p class="eyebrow">Frozen MVP contract</p>
-      <h2>검증은 성능 숫자보다 먼저 고정합니다.</h2>
-      <div class="method-grid">
-        <article><span>01</span><h3>분리</h3><p>환자 단위 train · calibration · held-out test 분리</p></article>
-        <article><span>02</span><h3>동결</h3><p>특징·가중치·임계값·분석 코드 해시 기록</p></article>
-        <article><span>03</span><h3>대조</h3><p>동일 검토 건수의 무작위 대기열 반복 비교</p></article>
-        <article><span>04</span><h3>한계 공개</h3><p>공통 실패·불확실성·적용 범위를 화면에 표시</p></article>
-      </div>
-    </section>
-  </main>
-
-  <footer>LesionLens MVP · local research demonstration only</footer>
-  <script src="app.js?v=real-ct-3"></script>
-</body>
-</html>
+<header class="topbar"><a class="brand" href="#workspace" aria-label="LesionLens 첫 화면"><span class="brand-mark" aria-hidden="true">L</span><span>LesionLens<small>한 번 더 살펴보기</small></span></a><nav aria-label="현재 화면"><a href="#workspace" class="nav-active">CT 확인 목록</a><a href="#hospitalModel">병원 맞춤 모델</a></nav><span class="connection"><i aria-hidden="true"></i>내 컴퓨터에 저장</span></header>
+<main id="workspace">
+<section class="page-heading" aria-labelledby="pageTitle"><div><p class="eyebrow">의료진 검토 대기열</p><h1 id="pageTitle">CT 확인 목록</h1></div><p class="page-copy">AI·정답 주석 대조로 먼저 볼 이유를 확인하세요.</p></section>
+<section id="nextCase" class="next-case" aria-label="다음 확인 사례 · 검색 필터와 무관한 전체 미확인 목록 기준" aria-live="polite"><p>다음 확인 사례를 찾고 있어요.</p></section><section id="queueSummary" class="queue-summary" aria-label="검토 대기열 요약" aria-live="polite"></section><details class="dataset-details"><summary>전체 데이터 현황</summary><section class="metrics" aria-label="확인 현황"><div><span>모든 사례</span><strong id="totalCases">—</strong></div><div><span>확인한 사례</span><strong id="reviewedCount">—</strong></div><div><span>연결된 CT 이미지</span><strong id="totalSlices">—</strong></div><div class="metric-guide"><span aria-hidden="true">📋</span><p>이유 확인 <span aria-hidden="true">→</span> CT 보기 <span aria-hidden="true">→</span> 확인 완료</p></div></section></details>
+<section class="workspace worklist-first"><section class="queue-panel" aria-label="CT 확인 목록">
+<div class="panel-heading"><h2>사례 목록</h2><span class="dataset-pill">공개 CT · 기존 AI 예측</span></div>
+<details class="feature-filters" open><summary>특징 필터</summary><div id="categoryFilters" class="category-filters" role="group" aria-label="살펴볼 이유"><button type="button" data-category="all" aria-pressed="true"><span aria-hidden="true">📋</span>전체 사례</button><button type="button" data-category="disagreement" aria-pressed="false"><span aria-hidden="true">💬</span>AI 표시가 달라요</button><button type="button" data-category="small" aria-pressed="false"><span aria-hidden="true">🔎</span>작은 표시가 있어요</button><button type="button" data-category="multiple" aria-pressed="false"><span aria-hidden="true">📍</span>여러 표시가 있어요</button><button type="button" data-category="countdiff" aria-pressed="false"><span aria-hidden="true">🔢</span>AI 표시 개수 차이</button><button type="button" data-category="volumediff" aria-pressed="false"><span aria-hidden="true">📐</span>AI 표시 부피 차이</button><button type="button" data-category="large" aria-pressed="false"><span aria-hidden="true">◉</span>전체 표시 부피 큼</button><button type="button" data-category="extent" aria-pressed="false"><span aria-hidden="true">▤</span>여러 CT 장에 표시</button><button type="button" data-category="missing" aria-pressed="false"><span aria-hidden="true">📂</span>AI 비교 자료 부족</button><button type="button" data-category="priority" aria-pressed="false"><span aria-hidden="true">📌</span>직접 먼저 보기 지정</button></div></details>
+<div class="queue-tools"><label class="search-box"><span aria-hidden="true">⌕</span><input id="caseSearch" type="search" placeholder="사례 번호로 찾기" aria-label="사례 번호로 찾기" autocomplete="off"></label><div class="filters" role="group" aria-label="확인 상태"><button type="button" class="filter active" data-filter="all" aria-pressed="true">전체</button><button type="button" class="filter" data-filter="pending" aria-pressed="false">확인 전</button><button type="button" class="filter" data-filter="reviewed" aria-pressed="false">확인 완료</button></div><label class="sort-label">정렬<select id="sortSelect"><option value="burden">크기·개수 검토 그룹</option><option value="priority">AI 차이 기반 재확인</option><option value="disagreement">AI 표시 차이가 큰 순서</option><option value="id">사례 번호순</option><option value="tumor">정답 표시 부피순</option></select></label></div>
+<details class="ranking-guide"><summary>정렬 기준 · 응급도 순위 아님</summary><p>크기와 표시 개수를 함께 비교해 그룹을 나눠요. 같은 그룹은 사례 번호순이며 의학적 우열은 없어요. 현재 자료 안의 상대 그룹으로, 자료가 달라지면 그룹도 달라질 수 있어요. 수동 지정은 먼저, 완료 사례는 뒤에 놓여요.</p><span>임상 응급도 순위가 아니며, 뒤에 있는 사례도 확인 대상이에요.</span></details><p id="visibleCount" class="visible-count" aria-live="polite">목록을 불러오고 있어요.</p><p id="emptyState" class="empty-state" hidden>조건에 맞는 사례가 없어요. 다른 분류나 검색어를 선택해 주세요.</p><div id="caseList" class="case-list" aria-live="polite"></div>
+<p class="workflow-note">분류와 정렬은 살펴볼 곳을 찾는 도구예요. 목록에서 안 보이거나 순서가 뒤여도 안전하다는 뜻은 아니에요.</p>
+</section></section>
+<details id="hospitalModel" class="hospital-model"><summary><span>병원 맞춤 모델</span><small>기관 데이터로 만드는 예측 모델 · UI 설계</small></summary><div class="model-design-body"><header><p class="eyebrow">기관별 모델 준비</p><h2>우리 병원 데이터로 모델 만들기</h2><p>설정 흐름을 미리 보는 화면입니다. 데이터 선택·업로드·학습·예측·저장은 연결되지 않았습니다.</p></header><ol class="model-steps" aria-label="계획된 준비 순서"><li>1. 데이터 승인</li><li>2. 모델 설정</li><li>3. 독립 평가</li><li>4. 도입 검토</li></ol><div class="model-design-grid"><section><h3>데이터 준비</h3><label for="institutionName">프로젝트 이름</label><input id="institutionName" disabled placeholder="기관 간 CT 분할 모델"><label for="dataLocation">데이터 보관 위치</label><select id="dataLocation" disabled><option>기관 내부 승인 저장소 · 연결 예정</option></select><div class="model-upload-placeholder"><strong>CT와 정답 주석 연결 영역</strong><p>비식별 CT · 검토된 주석 · 사용 승인 확인 후 연결하도록 설계합니다.</p><button type="button" disabled>데이터 연결 · 준비 중</button></div><p class="model-note">실제 환자정보나 서버 경로를 입력하지 마세요.</p></section><section><h3>모델과 평가</h3><label for="modelTask">예측 목표</label><select id="modelTask" disabled><option>간·종양 영역 분할</option></select><label for="baseModel">시작 모델</label><select id="baseModel" disabled><option>기본 분할 모델 · 선정 예정</option></select><label for="splitPolicy">검증 방식</label><select id="splitPolicy" disabled><option>환자 단위 학습 / 보정 / 독립 평가 분리</option></select><p class="model-note">병원별 적합성과 데이터 사용 권한은 아직 확인되지 않았습니다.</p></section></div><details class="model-gates"><summary>실제 연결 전 필요한 조건</summary><ul><li>기관 승인·데이터 이용 범위·필요한 윤리심의 확인</li><li>비식별화, 접근권한, 보관·삭제 정책 수립</li><li>환자 중복 없는 분할과 평가 전 규칙 동결</li><li>민감도·오탐·모델 공통 실패·동일 검토량 기준선 비교</li><li>의료진 검토 후 도입 여부 결정 — 자동 진료 적용 없음</li></ul></details><footer><span>실행 상태: 미연결 · 생성된 모델 없음</span><button type="button" disabled>모델 만들기 · 준비 중</button></footer></div></details><details class="evidence-status"><summary>이 화면의 근거와 검증 범위</summary><p>현재 순위는 AI 예측과 정답 주석(GT)의 특징을 함께 사용합니다. GT 없는 새 CT용 모델-only 순위는 아직 검증하지 않았습니다.</p><p>선택된 양성 사례 5건·640장으로 동작을 보여줍니다. 음성·응급 코호트, 실제 의료진 시간 절감, 독립 순위 성능 평가는 미실행입니다.</p><p>0.20 등의 값은 임시 기술 기준입니다. 모델들이 함께 놓친 영역은 불일치가 작을 수 있습니다. 예측 자료가 없는 사례의 처리 우선정책과 병리과 역할은 현장 확인이 필요합니다.</p><p>연구 계획의 직경(mm)·2모델 평가와 현재 부피(mL)·3모델 비교는 서로 다른 범위입니다.</p></details><section class="understanding" aria-labelledby="guideTitle"><div><span class="guide-symbol" aria-hidden="true">💡</span><h2 id="guideTitle">이것만 알면 쉽게 볼 수 있어요</h2></div><details><summary>‘AI 표시’와 ‘정답 표시’는 뭐가 다른가요?</summary><p>AI 표시는 모델이 종양일 수 있다고 표시한 영역이에요. 정답 표시는 공개 데이터셋에 붙어 있는 종양 주석(GT)이에요. 둘을 나란히 비교할 수 있지만, 어느 쪽도 이 화면만으로 새로운 진단을 내리는 도구는 아니에요.</p></details><details><summary>표시가 다르면 더 위험한 건가요?</summary><p>아니요. AI마다 놓친 곳이나 잘못 표시한 곳이 다를 수 있어 다시 확인할 이유가 되는 거예요. 작은 표시가 있다고 완치할 수 있다는 뜻도, 표시가 여러 개라고 전이됐다는 뜻도 아니에요. 위급도·완치 가능성·전이 가능성은 임상 정보와 의료진 판단이 필요해 여기서는 계산하지 않아요.</p></details><details><summary>작거나 여러 개인 표시는 어떻게 세나요?</summary><p>맞닿은 표시를 3차원 덩어리로 묶어 크기와 개수를 계산해요. 계산으로 나눈 덩어리는 의료진이 판정한 병변 개수와 다를 수 있어요. 자세한 기준과 측정값은 사례의 ‘자세히 보기’에서 확인할 수 있어요.</p></details></section>
+<dialog id="ctDialog" aria-labelledby="selectedCaseId"><div class="dialog-top"><span>선택한 사례의 CT</span><button id="closeCtDialog" type="button" autofocus>목록으로 돌아가기 <span aria-hidden="true">×</span></button></div><section id="detailPanel" class="detail-panel" aria-label="선택한 사례 CT"><div class="detail-heading"><div><p class="eyebrow">지금 보고 있는 사례</p><h2 id="selectedCaseId">사례 선택</h2><p id="selectedCaseMeta" class="case-meta"></p></div><button id="reviewToggle" class="review-button" type="button" aria-pressed="false" disabled>확인 완료로 표시</button></div>
+<div class="viewer-toolbar"><label>겹쳐 볼 표시<select id="overlaySelect" aria-label="비교할 AI 또는 정답 표시"><option value="gt">정답 표시</option><option value="baseline">기본 AI</option><option value="cappyv2">CAPPYv2</option><option value="cp050">CAPPYv2+ 실험</option><option value="none">CT만 보기</option></select></label><button id="realOverlayToggle" type="button" aria-pressed="true">표시 숨기기</button></div><p id="modelCaption" class="model-caption" aria-live="polite">정답 표시와 AI 예측은 달라요.</p>
+<div class="viewer-surface"><div class="image-topline"><span>CT 가로 단면</span><span id="realDataStatus" class="real-status" role="status" aria-live="polite">CT 보기에서 열 수 있어요.</span></div><p id="realCtUnavailable" class="real-unavailable" hidden>이미지를 불러오지 못했어요. 목록으로 돌아가 다시 열어 주세요.</p><div id="realImageFrame" class="real-image-frame" tabindex="0" aria-label="CT 이미지. 방향키 또는 휠로 이동"><img id="realCtImage" alt="선택한 사례의 CT 이미지" hidden><img id="realOverlayImage" alt="선택한 AI 또는 정답 표시" hidden><span class="orientation orientation-right" aria-label="환자 오른쪽">R</span><span class="orientation orientation-left" aria-label="환자 왼쪽">L</span></div><div class="image-bottomline"><span>같은 위치에서 표시를 비교해 보세요.</span><span>W 400 / L 50</span></div></div>
+<div class="slice-control"><button id="realPreviousSlice" type="button" aria-label="이전 CT 이미지">‹</button><label><span class="slice-heading">CT 이미지<strong id="realSliceLabel">— / —</strong></span><input id="realSliceSlider" type="range" min="0" max="0" value="0" aria-label="CT 이미지 위치"></label><button id="realNextSlice" type="button" aria-label="다음 CT 이미지">›</button></div><div class="viewer-help"><span>마우스 휠 · 방향키로 한 장씩 이동해요.</span><span>전체 CT에서 같은 위치로 연결돼요.</span></div><p id="realCtDescription" class="ct-description" aria-live="polite"></p><details class="case-facts-section"><summary>측정값과 자료 출처 자세히 보기</summary><dl id="caseFacts" class="case-facts"></dl><div id="comparisonFacts"></div></details></section></dialog>
+<footer class="footer"><span>LesionLens · 의료진의 재확인을 돕습니다.</span><details><summary>데이터와 사용 범위</summary><p>공개 LiTS CT, 정답 주석과 기존 연구 모델의 예측을 사용해요. 사례 번호는 환자 이름이 아니에요. 일반인에게 서비스 흐름을 설명할 수 있지만 진단·치료용으로 검증된 제품은 아니에요. 먼저 볼 표시와 확인 기록은 이 브라우저에만 저장돼요. 모델 비교는 기존 연구 결과를 보여주며 모델 우월성을 입증하지 않아요.</p></details></footer>
+</main><script src="app.js?v=review-groups-10"></script></body></html>
