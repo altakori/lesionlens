@@ -77,7 +77,7 @@ test('escaping, zero/horizontal wheel deltas, and finite slice bounds remain saf
   assert.equal(app.visibleSelection(app.normalizeManifest(manifest()), 'case_045').id, 'case_045');
 });
 
-test('static parent DOM has one matched viewer and cache-busted local assets', () => {
+test('static parent DOM has one matched viewer and versionless local assets', () => {
   const fs = require('node:fs');
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
   const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
@@ -87,8 +87,8 @@ test('static parent DOM has one matched viewer and cache-busted local assets', (
     'realPreviousSlice', 'realNextSlice', 'realSliceSlider', 'realSliceLabel', 'caseFacts', 'emptyState']) {
     assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
   }
-  assert.match(html, /styles\.css\?v=[a-z0-9-]+/);
-  assert.match(html, /app\.js\?v=[a-z0-9-]+/);
+  assert.match(html, /href="styles\.css"/);
+  assert.match(html, /src="app\.js"/);
   assert.match(html, /정답 주석/);
   assert.match(html, /기존 연구 모델의 예측/);
   assert.doesNotMatch(source, /SYN-|priorityCount|drawSyntheticCt|style="width:/);
@@ -438,4 +438,33 @@ test('summary partitions fixed cohort and counts manual pins only as supplementa
   const unknown = app.caseButtonHtml(cases[2],null,false,false,3);
   assert.match(unknown,/data-review-group="unknown"/);
   assert.match(unknown,/GT 크기·개수 자료 없음/);
+});
+
+test('browser startup removes legacy v without navigation or changing unrelated URL state', () => {
+  const vm = require('node:vm');
+  const source = require('node:fs').readFileSync(require.resolve('../app.js'), 'utf8');
+  for (const [input, expected] of [
+    ['/?v=review-groups-10', '/'],
+    ['/?case=case_001&v=review-groups-10&label=a%20b&tag=one&tag=two#viewer', '/?case=case_001&label=a%20b&tag=one&tag=two#viewer'],
+    ['/?v=review-groups-10&v=old#viewer', '/#viewer'],
+    ['/', null],
+    ['/?case=case_001&label=a%20b#viewer', null],
+  ]) {
+    const calls = [], state = {selectedCase: 'case_001'};
+    const location = Object.freeze({href: `http://localhost:8000${input}`});
+    const window = Object.freeze({location, history: {
+      state,
+      replaceState(...args) { calls.push(args); },
+    }});
+    let readyHandler;
+    vm.runInNewContext(source, {
+      window, URL, URLSearchParams,
+      document: {readyState: 'loading', addEventListener(event, handler) {
+        assert.equal(event, 'DOMContentLoaded'); readyHandler = handler;
+      }},
+    });
+    assert.equal(typeof readyHandler, 'function');
+    assert.deepEqual(calls, expected === null ? [] : [[state, '', expected]], input);
+    assert.equal(location.href, `http://localhost:8000${input}`);
+  }
 });

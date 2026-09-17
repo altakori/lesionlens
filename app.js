@@ -451,5 +451,11 @@ function startApp() {
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = {morphologyLayers, dominatesMorphology, morphologyPriority, compareMorphology, morphologyPriorityHtml, MANIFEST_VERSION, CASE_SPECS, normalizeManifest, reviewKey, readReviewed, setReviewed, filteredCases, visibleSelection, clampSlice, sliceValueText, wheelSlice, escapeHtml, caseButtonHtml, firstKey, readFirst, setFirst, MODELS, MODEL_VOXELS, SOURCE_LABELS, caseReason, comparisonHtml, reviewPriority, matchesCategory, selectNextCase, caseRecommendation, nextCaseHtml, queueSummaryHtml};
 if (typeof document !== 'undefined') {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('v')) {
+    // Keep unrelated query values (and their encoding) intact for bookmarked links.
+    const query = url.search.slice(1).split('&').filter(part => !new URLSearchParams(part).has('v')).join('&');
+    window.history.replaceState(window.history.state, '', url.pathname + (query ? `?${query}` : '') + url.hash);
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp); else startApp();
 }
