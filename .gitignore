@@ -17,3 +17,6 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 /qa/
+/work/
+# Local review bundle may contain medical screenshots and private Notion snapshots.
+/docs/reviews/irb-rubric-audit-20260917/

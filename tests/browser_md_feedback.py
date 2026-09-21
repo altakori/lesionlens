@@ -1,0 +1,141 @@
+"""Run against local integrated server, no downloads: python3 tests/browser_md_feedback.py."""
+import os
+from playwright.sync_api import expect, sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True, **({'executable_path':os.environ['CHROME_EXECUTABLE']} if os.environ.get('CHROME_EXECUTABLE') else {}))
+    page = browser.new_page()
+    page.goto('http://127.0.0.1:4173/')
+    page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
+    page.evaluate('localStorage.clear()')
+    page.reload()
+    card = page.locator('[data-case-id="DEMO-WORKFLOW-001"]')
+    card.wait_for()
+    real = page.locator('[data-case-id="case_000"]')
+    if real.count():
+        real.get_by_role('button', name='주치의에게 전송하기').click()
+        blocked = page.locator('#mdSendDialog')
+        assert blocked.get_by_role('button', name='보내기 불가 · 수신 담당자 미연결').is_disabled()
+        blocked.get_by_label('CAPPY2 current', exact=True).check()
+        blocked.get_by_label('CAPPY2 050', exact=True).check()
+        assert not blocked.get_by_label('모델 참고 없음', exact=True).is_checked()
+        blocked.locator('textarea').fill('SYNTHETIC local draft only')
+        page.keyboard.press('Escape')
+        blocked.get_by_role('button', name='초안 보관하고 닫기').click()
+        real.get_by_role('button', name='주치의에게 전송하기').click()
+        assert blocked.locator('textarea').input_value() == 'SYNTHETIC local draft only'
+        assert blocked.get_by_label('CAPPY2 current', exact=True).is_checked()
+        blocked.get_by_label('모델 참고 없음', exact=True).check()
+        assert not blocked.get_by_label('CAPPY2 current', exact=True).is_checked()
+        # None cannot be unchecked when no reference model is selected.
+        blocked.get_by_label('모델 참고 없음', exact=True).click()
+        assert blocked.get_by_label('모델 참고 없음', exact=True).is_checked()
+        assert blocked.get_by_role('button', name='보내기 불가 · 수신 담당자 미연결').is_disabled()
+        page.keyboard.press('Escape')
+        blocked.get_by_role('button', name='폐기하고 닫기').click()
+    card.get_by_role('button', name='CT 확대', exact=True).click()
+    assert card.locator('canvas').count() == 4
+    assert page.locator('dialog[open]').count() == 0
+    card.get_by_role('button', name='주치의에게 전송하기').click()
+    dialog = page.locator('#mdSendDialog')
+    assert dialog.locator('input[type=checkbox]:disabled').count() == 3
+    assert dialog.locator('.md-viewpoint-options [value=attached]').is_disabled()
+    dialog.locator('textarea').fill('SYNTHETIC browser note')
+    page.keyboard.press('Escape')
+    dialog.get_by_role('button', name='초안 보관하고 닫기').click()
+    # Reopen a pre-fix malformed draft after reload. Notes/token must survive;
+    # invalid empty/non-none must be normalized before display and resaved.
+    draft_id = page.evaluate('''() => {
+      const key=Object.keys(localStorage).find(k=>k.startsWith('lesionlens:md:v1:'));
+      const state=JSON.parse(localStorage.getItem(key));
+      const draft=state.drafts['DEMO-WORKFLOW-001'];
+      draft.selected=[]; draft.none=false;
+      localStorage.setItem(key,JSON.stringify(state));
+      return draft.id;
+    }''')
+    page.reload()
+    card.wait_for()
+    card.get_by_role('button', name='주치의에게 전송하기').click()
+    assert dialog.locator('textarea').input_value() == 'SYNTHETIC browser note'
+    none = dialog.get_by_label('모델 참고 없음', exact=True)
+    assert none.is_checked()
+    none.click()  # Native checkbox would uncheck; the invariant restores it.
+    assert none.is_checked()
+    assert dialog.get_by_role('button', name='DEMO 보내기', exact=True).is_enabled()
+    restored = page.evaluate('''() => {
+      const key=Object.keys(localStorage).find(k=>k.startsWith('lesionlens:md:v1:'));
+      return JSON.parse(localStorage.getItem(key)).drafts['DEMO-WORKFLOW-001'];
+    }''')
+    # Automatic intent survives normalization; this synthetic case has no viewpoint.
+    assert restored == {'id':draft_id,'notes':'SYNTHETIC browser note','selected':[],'none':True,'viewpointChoice':'auto'}
+    page.keyboard.press('Escape')
+    dialog.get_by_role('button', name='계속 작성').click()
+    # Throw before persistence: failed send must leave draft and case pending.
+    page.evaluate("() => { window.originalSet = Storage.prototype.setItem; Storage.prototype.setItem = function(){throw Error('test quota')}; }")
+    dialog.get_by_role('button', name='DEMO 보내기', exact=True).click()
+    assert dialog.is_visible()
+    assert dialog.locator('textarea').input_value() == 'SYNTHETIC browser note'
+    assert page.evaluate("Object.keys(JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k=>k.startsWith('lesionlens:md:v1:')))).sends).length") == 0
+    page.evaluate('() => { Storage.prototype.setItem = window.originalSet; }')
+    dialog.get_by_role('button', name='DEMO 보내기', exact=True).click()
+    assert not dialog.is_visible()
+    assert page.locator('[data-case-id="DEMO-WORKFLOW-001"]').count() == 0
+    page.reload()
+    page.locator('#mdFilter').select_option('sent')
+    page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
+    page.goto('http://127.0.0.1:4173/recipient.html')
+    page.get_by_role('link', name='상세 보기', exact=True).first.click()
+    page.locator('.md-record-memo').get_by_text('SYNTHETIC browser note', exact=True).wait_for()
+    page.get_by_role('button', name='수신 확인 (진료 판단 아님)').click()
+    page.reload()
+    assert page.get_by_role('button', name='수신 확인됨', exact=False).is_disabled()
+    page.goto('http://127.0.0.1:4173/')
+    page.locator('#mdFilter').select_option('sent')
+    page.get_by_role('button', name='다시 검토', exact=True).click()
+    page.locator('#mdFilter').select_option('pending')
+    page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
+    real = page.locator('[data-case-id="case_000"]')
+    if real.count():
+        real.get_by_role('button',name='CT 확대',exact=True).click()
+        viewer=real.locator('.md-inline-viewer')
+        assert viewer.locator('canvas').count()==4
+        assert page.locator('dialog[open]').count()==0
+        modes=viewer.get_by_role('group',name='동시 오버레이 방식')
+        assert modes.get_by_role('button').count()==3
+        assert viewer.locator('select').count()==0
+        eye=viewer.get_by_role('button',name='모든 패널 오버레이 표시',exact=True)
+        assert eye.inner_text()==''
+        assert eye.locator('svg[aria-hidden="true"]').count()==1
+        for mode,label in [('outline','테두리'),('box','박스'),('seg','seg 마스크')]:
+            button=modes.get_by_role('button',name=label,exact=True)
+            button.focus()
+            button.press('Enter')
+            assert button.get_attribute('aria-pressed')=='true'
+            assert modes.locator('button[aria-pressed="true"]').count()==1
+            eye.focus()
+            eye.press('Space')
+            assert eye.get_attribute('aria-pressed')=='false'
+            assert viewer.get_attribute('data-overlay-visible')=='false'
+            eye.press('Enter')
+            assert eye.get_attribute('aria-pressed')=='true'
+            assert viewer.get_attribute('data-overlay-visible')=='true'
+            assert viewer.get_attribute('data-overlay-mode')==mode
+            assert button.get_attribute('aria-pressed')=='true'
+        viewer.get_by_label('공통 절편',exact=True).fill('1')
+        # The requested slice becomes displayed only after atomic frame commit.
+        expect(viewer).to_have_attribute('data-load-state', 'ready')
+        expect(viewer).to_have_attribute('data-slice', '1')
+        assert viewer.get_attribute('data-slice')=='1'
+        assert viewer.locator('canvas[data-slice="1"]').count()==4
+        viewer.locator('canvas').first.press('Shift+ArrowRight')
+        assert viewer.get_attribute('data-pan-x')=='10'
+        viewer.get_by_label('공통 확대',exact=True).fill('2')
+        assert viewer.get_attribute('data-zoom')=='2'
+        real.get_by_role('button',name='CT 접기',exact=True).click()
+        assert viewer.locator('canvas').count()==0
+    # Functional structure at target widths; visual overflow is Astra's CSS QA.
+    for width in (1440,768,390,320):
+        page.set_viewport_size({'width':width,'height':900})
+        assert page.locator('#mdFilter').is_visible()
+    browser.close()
+print('MD workflow browser behavioral checks passed')

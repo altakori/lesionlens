@@ -77,21 +77,38 @@ test('escaping, zero/horizontal wheel deltas, and finite slice bounds remain saf
   assert.equal(app.visibleSelection(app.normalizeManifest(manifest()), 'case_045').id, 'case_045');
 });
 
-test('static parent DOM has one matched viewer and versionless local assets', () => {
+test('MD shell has a pending main queue, inline CT review, only a send dialog and versionless local assets', () => {
   const fs = require('node:fs');
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
   const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
-  for (const id of ['overlaySelect', 'modelCaption', 'comparisonFacts', 'ctDialog', 'closeCtDialog', 'categoryFilters', 'visibleCount', 'caseList', 'caseSearch', 'sortSelect', 'totalCases', 'reviewedCount', 'totalSlices',
-    'selectedCaseId', 'selectedCaseMeta', 'reviewToggle', 'realDataStatus', 'realCtUnavailable',
-    'realImageFrame', 'realCtImage', 'realOverlayImage', 'realCtDescription', 'realOverlayToggle',
-    'realPreviousSlice', 'realNextSlice', 'realSliceSlider', 'realSliceLabel', 'caseFacts', 'emptyState']) {
+  const viewer = fs.readFileSync(require.resolve('../md-viewer.js'), 'utf8');
+  const workflow = fs.readFileSync(require.resolve('../md-workflow.js'), 'utf8');
+  const radiomics = fs.readFileSync(require.resolve('../radiomics.js'), 'utf8');
+  for (const id of ['mdQueue', 'mdFilter', 'mdSearch', 'mdStatus', 'mdList', 'mdSendDialog',
+    'radiomicsPanel', 'radiomicsList', 'radiomicsDialog', 'radiomicsCt', 'radiomicsGt']) {
     assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
   }
-  assert.match(html, /href="styles\.css"/);
-  assert.match(html, /src="app\.js"/);
+  assert.match(html, /<body data-md-workflow="true">/);
+  assert.match(html, /<select id="mdFilter"><option value="pending">/);
+  for (const filter of ['reviewed','sent','all']) assert.ok(html.includes(`value="${filter}"`));
+  assert.ok(html.indexOf('id="mdQueue"') < html.indexOf('id="radiomicsPanel"'));
+  assert.deepEqual(html.match(/<dialog\b[^>]*>/g), ['<dialog id="mdSendDialog" class="md-send-dialog">']);
+  assert.match(html, /<section hidden id="radiomicsDialog"/);
+  assert.doesNotMatch(html, /id="(?:ctDialog|overlaySelect|realImageFrame)"/);
+  assert.doesNotMatch(viewer + radiomics, /showModal\s*\(/);
+  assert.equal((workflow.match(/\.showModal\(/g) || []).length, 1);
+  assert.match(workflow, /getElementById\('mdSendDialog'\)/);
+  assert.match(viewer, /sources=Object\.keys\(g\.MD\.labels\)/);
+  assert.match(viewer, /sources\.map\(/);
+  assert.match(viewer, /node\('canvas'\)/);
+  for (const file of ['styles.css','radiomics.css','md-workflow.css']) assert.ok(html.includes(`href="${file}"`));
+  for (const file of ['app.js','radiomics.js','md-core.js','md-viewer.js','md-workflow.js']) assert.ok(html.includes(`src="${file}"`));
+  assert.doesNotMatch(html, /(?:src|href)="[^" ]+\.(?:js|css)\?[^" ]*"/);
+  assert.doesNotMatch(html, /\son[a-z]+\s*=/i);
+  assert.doesNotMatch(html, /<script\b[^>]*>\s*[^<\s]/i);
   assert.match(html, /정답 주석/);
-  assert.match(html, /기존 연구 모델의 예측/);
-  assert.doesNotMatch(source, /SYN-|priorityCount|drawSyntheticCt|style="width:/);
+  assert.match(html, /GT·개수 차이는 이유\/순위에 쓰지 않습니다/);
+  assert.doesNotMatch(source + viewer, /SYN-|priorityCount|drawSyntheticCt|style="width:/);
   assert.doesNotMatch(source, /detailPanel.*innerHTML/);
   assert.match(source, /if \(\$\('queueSummary'\)\)/);
   assert.match(source, /if \(\$\('nextCase'\)\)/);

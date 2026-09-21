@@ -1,5 +1,7 @@
 # Technical recheck queue rules
 
+> 최신 2차 멘토링·MD UX 계약: `md-feedback-task.md`. 모델 간 후보 대응 중심 흐름이 이전 크기·개수 기본 정렬·병리학과 전달안을 대체한다. 아래 기존 구현 기록·연구 규칙은 역사적 맥락이며 완료 여부는 최신 검증 기록을 따른다.
+
 This queue orders segmentation comparison work, not clinical urgency. These are authored, provisional project heuristics, not clinically validated thresholds. Missing predictions and unknown clinical information cannot establish reassuring findings. Clinical urgency remains “임상 응급도: 판단 자료 부족”. No patient condition, pathology, staging or prognosis is inferred.
 
 ## Ordering and workflow

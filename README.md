@@ -1,3 +1,9 @@
+> **실행 입구:** `npm run serve` (`uv`로 영상 검증 의존성 포함) → `http://127.0.0.1:4173/`. 기본 화면은 모델 간 3D 후보 대응에 따른 재검토 CT 목록(실제 로컬 연구자료 5건)입니다. 별도 Radiomics 24건은 아래 보조 영역에서 펼칩니다. `recipient.html`은 같은 브라우저·동일 origin의 DEMO 수신·열람 화면입니다. 실제 병원 연락 연동은 없으며 환자–담당자 연결이 없는 사례는 전송 차단합니다. 원본·파생영상은 로컬 전용이며 일반 정적 서버로 `data/`를 제공하지 않습니다. 새 영상 생성 중에는 서버를 중지하고 검증 후 재시작합니다. 최신 검증 기록은 `docs/md-feedback-task.md`를 따릅니다.
+
+> 최신 2차 멘토링·MD UX 계약: `docs/md-feedback-task.md`. 모델 간 후보 대응 중심 흐름이 이전 크기·개수 기본 정렬·병리학과 전달안을 대체한다. 아래 기존 구현 기록·연구 규칙은 역사적 맥락이며 완료 여부는 최신 검증 기록을 따른다.
+>
+> 라디오믹스 4축 그룹은 검토용 탐색 결과이지 의료 우선순위 검증 결과가 아닙니다. 아래의 5건·640장·3모델 설명은 **기존 AI 비교 탭**의 범위입니다.
+
 > 최신 기본 정렬: 크기·개수 검토 그룹(GT 최대 연결 표시 부피와 개수의 Pareto 그룹). 전체 자료 안의 상대 그룹이며 임상 중증도·응급도가 아닙니다. [정렬 규칙](docs/morphology-review-ranking.md) · [의학 자료 적용 범위](docs/size-count-evidence.md).
 
 > 심사 반영 작업 전 [REVIEW_ACTION_GUIDE](docs/REVIEW_ACTION_GUIDE.md)를 읽습니다. 병원 맞춤 모델 화면은 UI만이며 업로드·학습·추론·저장은 연결되지 않았습니다.
@@ -47,7 +53,7 @@ data/model_compare/{baseline,cappyv2,cp050}/case_{000,001,035,048}.nii.gz
 ```bash
 python scripts/prepare_model_compare.py
 python scripts/prepare_model_compare.py --verify-only
-python scripts/serve_local.py
+python scripts/serve_integrated.py
 ```
 
 `http://127.0.0.1:4173`에서 엽니다. 새 manifest 적용에는 서버 재시작이 필요합니다. `--verify-only`는 승인된 원본에서 모든 측정값과 이미지 바이트를 다시 계산해 저장 결과와 비교하며 파일을 쓰지 않습니다.

@@ -181,8 +181,9 @@ function nextCaseHtml(items, {first = new Set(), reviewed = new Set(), state = '
   const reason = morphology.status === 'available'
     ? `최대 연결 표시 부피 ${morphology.largestVolumeMl.toFixed(2)} mL · 연결 표시 ${morphology.componentCount}개 · GT`
     : 'GT 크기·개수 자료 없음';
-  return `<h3>다음 확인 사례 · ${id}</h3><p>전체 기본 크기·개수 대기열 · GT (화면 정렬·필터와 무관) · 자료 내 상대 그룹</p><p class="case-reason">${first.has(item.id) ? '직접 먼저 보기 지정 · ' : ''}${group === null ? '그룹 자료 없음' : `${group}그룹`} · ${escapeHtml(reason)}</p>
-    <button type="button" data-action="open" data-id="${id}" aria-label="${id} CT 보기">${id} CT 보기</button>`;
+  return `<h3><span class="next-label">다음 확인 사례</span><span class="next-id">${id}</span></h3>
+    <details class="next-evidence"><summary>선정 이유 · 응급도 순위 아님</summary><p>전체 기본 크기·개수 대기열 · GT (화면 정렬·필터와 무관) · 자료 내 상대 그룹</p><p class="case-reason">${first.has(item.id) ? '직접 먼저 보기 지정 · ' : ''}${group === null ? '그룹 자료 없음' : `${group}그룹`} · ${escapeHtml(reason)}</p></details>
+    <button type="button" data-action="open" data-id="${id}" aria-label="${id} CT 보기">CT 보기 <span aria-hidden="true">↗</span></button>`;
 }
 function queueSummaryHtml(items, {reviewed = new Set(), first = new Set(), state = 'ready'} = {}) {
   if (state === 'loading') return '<p>대기열 집계 중이에요.</p>';
@@ -192,7 +193,7 @@ function queueSummaryHtml(items, {reviewed = new Set(), first = new Set(), state
   const firstGroup = pending.filter(item => layers.get(item.id) === 1).length;
   const unknown = pending.filter(item => layers.get(item.id) === null).length;
   const pins = pending.filter(item => first.has(item.id)).length;
-  return `<p>전체 기본 대기열 · 자료 내 상대 그룹</p><p>1그룹 확인 전 <strong>${firstGroup}</strong>건</p><p>다른 그룹 확인 전 <strong>${pending.length - firstGroup - unknown}</strong>건</p><p>GT 자료 없음 · 확인 전 <strong>${unknown}</strong>건</p><p>확인 완료 <strong>${items.length - pending.length}</strong>건</p>${pins ? `<p>별도 안내 · 확인 전 중 수동 지정 <strong>${pins}</strong>건</p>` : ''}<p>응급 소견 미평가 <strong>${items.length}</strong>건</p>`;
+  return `<p class="progress-count">확인 완료 <strong>${items.length - pending.length}</strong>건</p><details class="progress-details"><summary>전체 진행 현황</summary><div class="progress-breakdown"><p>전체 기본 대기열 · 자료 내 상대 그룹</p><p>1그룹 확인 전 <strong>${firstGroup}</strong>건</p><p>다른 그룹 확인 전 <strong>${pending.length - firstGroup - unknown}</strong>건</p><p>GT 자료 없음 · 확인 전 <strong>${unknown}</strong>건</p>${pins ? `<p>별도 안내 · 확인 전 중 수동 지정 <strong>${pins}</strong>건</p>` : ''}<p>응급 소견 미평가 <strong>${items.length}</strong>건</p></div></details>`;
 }
 function clampSlice(value, count) { return Math.max(0, Math.min(count - 1, Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0)); }
 function sliceValueText(index, count) { return `${index + 1} / ${count}`; }
@@ -232,6 +233,7 @@ function comparisonHtml(item) {
 }
 
 function startApp() {
+  if (document.body?.dataset.mdWorkflow) return;
   const $ = id => document.getElementById(id);
   // The parent supplies this static DOM contract.
   let cases = [], reviewed = new Set(), selected = null, slice = 0, overlay = true, generation = 0, loaded = false;

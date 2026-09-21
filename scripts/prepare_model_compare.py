@@ -103,12 +103,13 @@ def encode_plane(array, kind):
     return buffer.getvalue()
 
 
-def build(repo=Path('.'), verify_only=False):
+def build(repo=Path('.'), verify_only=False, evidence=False):
     repo = repo.absolute()
     root = repo / 'data/model_compare'
     entries = json.loads(safe_file(repo, 'scripts/compare_sources.json').read_text(encoding='utf-8'))
     entries = {(entry['id'], entry['kind']): entry for entry in entries}
     cases = []
+    evidence_cases = {}
     for case_id in CASES:
         objects = {}
         if case_id in original.EXPECTED:
@@ -122,6 +123,12 @@ def build(repo=Path('.'), verify_only=False):
             for kind in MODELS:
                 objects[kind] = load_source(root, entries[case_id, kind])
         arrays, spacing, voxel_ml = canonical_arrays(objects)
+        if evidence:
+            try:
+                from scripts.candidate_evidence import compare
+            except ModuleNotFoundError:
+                from candidate_evidence import compare
+            evidence_cases[case_id] = compare(arrays, voxel_ml)
         stats = {kind: mask_stats(mask, voxel_ml) for kind, mask in arrays.items() if kind != 'ct'}
         areas = {kind: np.count_nonzero(mask, axis=(0, 1)).tolist() for kind, mask in arrays.items() if kind != 'ct'}
         depth = arrays['ct'].shape[2]
@@ -161,10 +168,28 @@ def build(repo=Path('.'), verify_only=False):
         pending = safe_file(repo, 'data/model_compare/manifest.pending', must_exist=False)
         pending.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
         pending.replace(target)
+    if evidence:
+        try:
+            from scripts.candidate_evidence import RULES
+        except ModuleNotFoundError:
+            from candidate_evidence import RULES
+        artifact = {'version': 'md-evidence-v1', 'manifestSha256': original.sha256(target),
+                    'rules': RULES, 'cases': evidence_cases}
+        out = safe_file(repo, 'data/model_compare/evidence.json', must_exist=verify_only)
+        if verify_only:
+            if json.loads(out.read_text()) != artifact:
+                raise ValueError('evidence differs from full source masks')
+        else:
+            out.write_text(json.dumps(artifact, indent=2), encoding='utf-8')
+    # Return the in-memory recomputation, never the untrusted sidecar contents.
+    # Runtime serving compares its captured artifact to this verified result.
     print(json.dumps({'version': VERSION, 'cases': 5, 'slices': sum(c['sliceCount'] for c in cases), 'sourceBound': True}))
+    return artifact if evidence else None
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verify-only', action='store_true')
-    build(verify_only=parser.parse_args().verify_only)
+    parser.add_argument('--evidence', action='store_true', help='derive provisional full-volume model correspondence')
+    args = parser.parse_args()
+    build(verify_only=args.verify_only, evidence=args.evidence)

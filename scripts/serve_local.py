@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT_FILES = {"/", "/index.html", "/styles.css", "/app.js"}
+FONT_PATH = "/fonts/PretendardVariable.woff2"
 DATA_MANIFEST = "/data/real_cases/manifest.json"
 EXPECTED_IDS = ["LL-CT-001", "LL-CT-002", "LL-CT-003"]
 SLICE_COUNT = 24
@@ -178,7 +179,7 @@ class CappHandler(SafeDemoHandler):
         path = unquote(urlsplit(self.path).path)
         if '\\' in path or '..' in Path(path).parts:
             return False
-        return path in ROOT_FILES or (self.manifest_content is not None and (path == self.manifest_path or path in self.asset_hashes))
+        return path in ROOT_FILES or path == FONT_PATH or (self.manifest_content is not None and (path == self.manifest_path or path in self.asset_hashes))
 
     def _serve(self, head=False):
         if not self._allowed():
@@ -196,7 +197,7 @@ class CappHandler(SafeDemoHandler):
                 content = file.read_bytes()
                 if path in self.asset_hashes and hashlib.sha256(content).hexdigest() != self.asset_hashes[path]:
                     raise ValueError('changed web asset')
-                mime = self.guess_type(str(file))
+                mime = 'font/woff2' if path == FONT_PATH else self.guess_type(str(file))
         except (OSError, ValueError):
             self._reject()
             return

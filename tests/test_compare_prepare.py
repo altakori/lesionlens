@@ -1,4 +1,6 @@
 import io
+import json
+import copy
 import tempfile
 import unittest
 from pathlib import Path
@@ -59,6 +61,53 @@ class ComparePrepareTests(unittest.TestCase):
         shifted = affine.copy(); shifted[0, 3] = 1e-7
         with self.assertRaisesRegex(ValueError, 'exact'):
             prepare.canonical_arrays({'ct': ct, 'gt': nib.Nifti1Image(mask, shifted)})
+
+    def test_runtime_verification_recomputes_synthetic_masks_and_rejects_moved_candidate(self):
+        # Miniature source cohort only replaces the fixed five-case schema gate.
+        # Hash/geometry checks, image encoding/binding, full-mask comparison,
+        # evidence equality and the production runtime verifier all run normally.
+        from scripts.serve_integrated import verify_source_evidence
+        from scripts.evidence_schema import validate
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            repo = Path(directory)
+            (repo / 'scripts').mkdir()
+            entries = []
+            for kind in ('ct','gt',*prepare.MODELS):
+                array = np.zeros((8,8,3), dtype=np.uint8)
+                if kind != 'ct':
+                    array[1 if kind != 'cp050' else 6, 1, 1] = 2
+                path = repo / 'data/model_compare' / kind / 'case_900.nii.gz'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                obj = nib.Nifti1Image(array, np.eye(4))
+                nib.save(obj, str(path))
+                entries.append({'id':'case_900','kind':kind,'local':f'{kind}/case_900.nii.gz',
+                                'sha256':prepare.original.sha256(path),'shape':[8,8,3],
+                                'affine':np.eye(4).tolist(),'spacing':[1,1,1],'orientation':'RAS',
+                                'voxels2':int(np.count_nonzero(array == 2))})
+            (repo / 'scripts/compare_sources.json').write_text(json.dumps(entries))
+            with patch.object(prepare, 'CASES', {'case_900':(3,1)}), \
+                    patch.object(prepare, 'validate_manifest'), patch('builtins.print'):
+                original = prepare.build(repo=repo, evidence=True)
+                self.assertEqual(verify_source_evidence(repo), original)
+                manifest = json.loads((repo / 'data/model_compare/manifest.json').read_text())
+                artifact = repo / 'data/model_compare/evidence.json'
+                original_bytes = artifact.read_bytes()
+                forged = copy.deepcopy(original)
+                case = forged['cases']['case_900']
+                candidate = case['models']['cp050']['candidates'][0]
+                candidate.update(voxel=[5,1,1], bbox=[[5,5],[1,1],[1,1]])
+                for reason in case['reasons']:
+                    if reason['candidateId'] == 'cp050:1':
+                        reason['voxel'] = [5,1,1]
+                validate(forged, manifest, original['manifestSha256'])
+                artifact.write_text(json.dumps(forged))
+                with self.assertRaisesRegex(ValueError, 'full source masks'):
+                    verify_source_evidence(repo)
+                artifact.write_bytes(original_bytes)
+                source = repo / 'data/model_compare/cp050/case_900.nii.gz'
+                source.write_bytes(b'unapproved synthetic bytes')
+                with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+                    verify_source_evidence(repo)
 
 
 if __name__ == '__main__': unittest.main()
