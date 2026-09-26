@@ -35,8 +35,8 @@
     // The synthetic workflow case has no CT at all, so it gets no box rather than an
     // empty framed placeholder.
     if(!series)return null;
-    const box=el('div',null,'md-series');
-    box.append(el('p','환자 시리즈(시연 가정) · '+M.seriesSummary(c),'md-series-title'));
+    const box=el('div',null,'md-series-wrap'),bar=el('div',null,'md-series');
+    const title=el('p','환자 시리즈(시연 가정) · '+M.seriesSummary(c),'md-series-title');
     const chips=el('div',null,'md-series-chips');
     const note=el('p','','md-series-status');note.setAttribute('role','status');
     const host=el('div',null,'md-series-viewer');host.hidden=true;
@@ -44,7 +44,10 @@
     function closeStudy(){if(shown){shown.close();shown=null;}host.hidden=true;host.replaceChildren();}
     for(const study of series.studies){
       if(study.relation==='current'){chips.append(el('span',study.label+' · '+study.alias,'md-series-current'));continue;}
-      const chip=el('button',study.label+' · '+study.alias+(study.assumedDate?' · '+study.assumedDate+'(가정)':''));
+      const chip=el('button');
+      chip.append(el('span',study.label+' · '+study.alias));
+      // The assumed date is duplicated in the note, so narrow widths drop it first.
+      if(study.assumedDate)chip.append(el('span',' · '+study.assumedDate+'(가정)','md-series-date'));
       chip.type='button';chip.className='md-series-chip';chip.dataset.seriesRelation=study.relation;
       chip.onclick=()=>{
         const other=cases.find(x=>x.id===study.alias);
@@ -57,7 +60,10 @@
       };
       chips.append(chip);
     }
-    box.append(chips,note,host,el('p',series.basis+' · 동일 환자 신원 미검증 · 촬영일은 시연 가정값 · 경과 판단에 쓰지 마세요','md-series-note'));
+    bar.append(title,chips,note,el('p',series.basis+' · 동일 환자 신원 미검증 · 촬영일은 시연 가정값 · 경과 판단에 쓰지 마세요','md-series-note'));
+    // The study viewer is a sibling of the status bar, so opening a study never
+    // stretches the bar itself.
+    box.append(bar,host);
     return box;
   }
   function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();const items=M.queue(cases,evidence,state,filter.value,search.value);

@@ -159,6 +159,28 @@ body[data-md-workflow="true"] .topbar{padding:12px max(24px,calc((100vw - 1160px
 #mdList .md-inline-viewer[hidden]{display:none}
 #mdList .md-case-card:has(.md-inline-viewer:not([hidden])) .md-decision-actions{grid-column:1/-1;grid-row:auto;padding-top:12px;border-top:1px solid #e3e5ee}
 #mdList .md-case-card>.md-sent-record-link{grid-column:1/-1;font-size:12px}
+/* Series is a one-line status bar, not a column: it spans the card so the 165px
+   identity column never stretches the row into dead space. */
+#mdList .md-series-wrap{grid-column:1/-1;grid-row:3;margin:2px 0 0}
+#mdList .md-series{padding:5px 10px;border:1px solid #e8e6f2;border-radius:8px;background:#faf9fe;font-size:12px;line-height:1.5}
+#mdList .md-series-title{display:inline-block;font-size:12px;font-weight:600;color:#4b4365;margin:0 10px 0 0}
+#mdList .md-series-chips{display:inline-flex;flex-wrap:wrap;gap:6px;margin:0;vertical-align:middle}
+#mdList .md-series-chip{padding:4px 9px;min-height:28px;font-size:12px;border:1px solid #d3cbe8;border-radius:6px;background:#fff;color:#514268}
+#mdList .md-series-chip:disabled{color:#9a9dab;background:#f4f5f8;border-color:#e6e8ef}
+#mdList .md-series-current{padding:4px 9px;font-size:12px;font-weight:600;color:#3f3357;border:1px dashed #bfb3dd;border-radius:6px}
+#mdList .md-series-status{display:block;margin:4px 0 0;font-size:11px;color:#5f6472;overflow-wrap:anywhere}
+#mdList .md-series-status:empty{display:none}
+#mdList .md-series-note{display:block;margin:2px 0 0;font-size:11px;color:#83889a;line-height:1.5}
+@media(max-width:560px){#mdList .md-series-date{display:none}}
+/* One CT-only panel, so the box hugs the canvas instead of sitting in a full-width tray. */
+#mdList .md-series-viewer{display:block;width:min(100%,462px);max-width:100%;margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#f3f4f9}
+#mdList .md-series-viewer .md-canvas{width:min(100%,420px)}
+/* A single CT panel does not need the four-up grid tracks that shrink it to half width. */
+#mdList .md-series-viewer .md-viewer-grid{display:block}
+#mdList .md-series-viewer .md-image-panel{margin:0}
+@media(max-width:480px){#mdList .md-series-viewer{width:100%}}
+#mdList .md-series-viewer[hidden]{display:none}
+#mdList .md-case-card:has(.md-details[open]) .md-series-wrap{grid-row:4}
 .md-secondary{margin-top:12px}
 @media(max-width:800px){
 body[data-md-workflow="true"] .topbar{padding:12px 18px}.md-send-navigation{padding:8px 18px}
@@ -170,6 +192,9 @@ body[data-md-workflow="true"] .topbar{padding:12px 18px}.md-send-navigation{padd
 #mdList .md-details[open]{grid-column:1/-1;grid-row:4}
 #mdList .md-decision-actions,#mdList .md-case-card:has(.md-details[open]) .md-decision-actions{grid-column:1/-1;grid-row:auto;justify-content:flex-end}
 #mdList .md-inline-viewer{padding:8px;margin:0}
+#mdList .md-series-wrap{grid-column:1/-1;grid-row:auto}
+#mdList .md-series{padding:8px 10px}
+#mdList .md-series-title{white-space:normal}
 .md-quant-table{font-size:11px}.md-quant-table td,.md-quant-table th{padding:5px}
 }
 
