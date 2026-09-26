@@ -52,7 +52,9 @@
 #mdSendDialog fieldset { border:1px solid var(--md-line); border-radius:10px; margin:20px 0; padding:12px 16px; }
 #mdSendDialog legend { color:var(--md-muted); font-size:13px; padding:0 6px; }
 #mdSendDialog label { display:flex; align-items:center; gap:8px; font-size:14px; min-height:44px; }
-#mdSendDialog input[type=checkbox] { accent-color:var(--md-accent); width:18px; height:18px; min-height:18px; }
+#mdSendDialog input[type=checkbox], #mdSendDialog input[type=radio] { accent-color:var(--md-accent); width:18px; height:18px; min-height:18px; }
+#mdSendDialog .md-followup-hint { color:var(--md-muted); font-size:13px; margin:6px 0 0; }
+.md-record-followup { font-weight:600; }
 #mdSendDialog label:has(textarea) { display:block; }
 #mdSendDialog textarea { display:block; resize:vertical; width:100%; min-height:130px; padding:12px; border:1px solid #cdd0de; border-radius:9px; font:inherit; margin:8px 0 14px; box-sizing:border-box; }
 #mdSendDialog button[aria-label="DEMO 보내기"], #mdSendDialog .md-send-submit { background:var(--md-accent); color:white; width:48px; height:48px; font-size:22px; border:0; margin:6px 8px 0 0; }
@@ -202,3 +204,5 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 .md-record-receipt:disabled{color:#626879;background:#f1f2f6;opacity:1}
 .md-inbox-empty{padding:22px;color:#686d7d}
 @media(max-width:800px){main.md-recipient{padding:20px 16px}.md-inbox-list .md-inbox-item{grid-template-columns:1fr auto;padding:14px;gap:8px 12px}.md-inbox-item h2{grid-column:1;grid-row:1}.md-inbox-state{grid-column:2;grid-row:1}.md-inbox-reason{grid-column:1/-1;grid-row:2}.md-inbox-meta{grid-column:1/-1;grid-row:3}.md-inbox-kind{grid-column:1;grid-row:4}.md-inbox-item .md-record-link{grid-column:2;grid-row:4}.md-record-detail{padding:16px}.md-received-essentials{grid-template-columns:1fr;gap:10px}.md-detail-summary h2{font-size:20px}}
+/* Compact follow-up choice on narrow screens; touch targets stay >=44px. */
+@media(max-width:480px) { #mdSendDialog fieldset.md-followup { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; } #mdSendDialog fieldset.md-followup legend, #mdSendDialog fieldset.md-followup .md-followup-hint { grid-column:1 / -1; } }

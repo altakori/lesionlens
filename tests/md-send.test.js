@@ -131,3 +131,35 @@ test('automatic drafts awaiting a frame stay automatic on reopen; legacy drafts 
  assert.equal(d.viewpointChoice,'auto');assert.equal(d.viewpoint,undefined);
  assert.equal(M.normalizeDraft(M.demo,draft()).viewpointChoice,undefined);
 });
+
+test('follow-up opinion is never preselected; unknown or empty saved values stay absent',()=>{
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,draft()),'followup'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{}),'followup'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{followup:''}),'followup'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{followup:'selected_by_ai'}) ,'followup'),false);
+ assert.equal(M.normalizeDraft(M.demo,{followup:'short_term_followup'}).followup,'short_term_followup');
+ assert.equal(M.normalizeDraft(M.demo,{followup:'none'}).followup,'none');
+ assert.deepEqual(M.followupOptions,['short_term_followup','immediate_us_biopsy','other','none']);
+});
+
+test('MD follow-up opinion is stored once in the immutable snapshot and re-read unchanged',async()=>{
+ const {c,context,scope}=await setup(),storage=memory(),s=M.store(storage,scope);
+ const d={...draft('followup-send'),followup:'short_term_followup',notes:'SYNTHETIC followup memo'};
+ const r=s.send(c,d,null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(r.followup,'short_term_followup');assert.equal(M.followupLabel(r.followup),'단기 추적검사');
+ d.followup='immediate_us_biopsy';d.notes='MUTATED AFTER SEND';
+ const reloaded=M.store(storage,scope).read().sends[r.id];
+ assert.equal(reloaded.followup,'short_term_followup');assert.equal(reloaded.notes,'SYNTHETIC followup memo');
+ assert.equal(JSON.stringify(reloaded),JSON.stringify(r));
+ const r2=s.send(c,{...draft('followup-none'),followup:'none'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(r2.followup,'none');assert.equal(M.followupLabel(r2.followup),'의견 없음');
+ assert.equal(M.followupLabel(undefined),'이 전송에는 의견 기록이 없습니다.');
+ assert.equal(M.followupLabel('ct_is_normal'),'읽을 수 없는 의견 유형');
+});
+
+test('an unrecognised follow-up value is refused and leaves no send record',async()=>{
+ const {c,context,scope}=await setup(),s=M.store(memory(),scope);
+ assert.throws(()=>s.send(c,{...draft('bad-followup'),followup:'ct_is_normal'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid followup opinion/);
+ assert.equal(s.read().sends['bad-followup'],undefined);
+ assert.equal(Object.keys(s.read().sends).length,0);
+});

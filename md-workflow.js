@@ -118,6 +118,10 @@
     const checks={};for(const key of M.models){const label=el('label',M.labels[key]), check=el('input');check.type='checkbox';check.checked=draft.selected.includes(key);check.disabled=!M.availableModel(c,key);checks[key]=check;
       check.onchange=()=>{draft.selected=M.models.filter(k=>checks[k].checked);draft.none=!draft.selected.length;persist();};label.prepend(check);group.append(label);}
     const noLabel=el('label','모델 참고 없음'),none=el('input');none.type='checkbox';none.checked=draft.none;none.onchange=()=>{draft.none=none.checked;if(draft.none)draft.selected=[];persist();};noLabel.prepend(none);group.append(noLabel);dialog.append(group);
+    const followup=el('fieldset',null,'md-followup');followup.append(el('legend','후속조치 의견  ·  MD 작성 · AI 자동 선택 아님'));
+    const followupHint=el('p','메모에 원하는 후속조치를 직접 적어주세요.','md-followup-hint');followupHint.hidden=draft.followup!=='other';
+    const followupRadios={};for(const key of M.followupOptions){const l=el('label',M.followupLabels[key]),r=el('input');r.type='radio';r.name='md-followup';r.value=key;r.checked=draft.followup===key;r.onchange=()=>{if(!r.checked)return;draft.followup=key;followupHint.hidden=key!=='other';persist();};followupRadios[key]=r;l.prepend(r);followup.append(l);}
+    followup.append(followupHint);dialog.append(followup);
     const notesLabel=el('label','MD 추가 소견·임상 메모 (로컬 초안 · 실제 전송 불가)'),notes=el('textarea');notes.value=draft.notes;notes.oninput=()=>{draft.notes=notes.value;persist();};notesLabel.append(notes);dialog.append(notesLabel,error);
     const send=action('✈',()=>{if(busy||!allowed||!validViewpoint()||!M.selection(c,draft.selected,draft.none))return;busy=true;send.disabled=true;try{
       const record=records.send(c,draft,e,researchEnvelope?'LOCAL_DEMO':'DEMO',researchEnvelope);

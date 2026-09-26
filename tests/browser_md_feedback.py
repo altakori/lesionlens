@@ -39,6 +39,14 @@ with sync_playwright() as p:
     card.get_by_role('button', name='주치의에게 전송하기').click()
     dialog = page.locator('#mdSendDialog')
     assert dialog.locator('input[type=checkbox]:disabled').count() == 3
+    # The MD opinion must start untouched: no radio preselects, no AI guess.
+    assert dialog.locator('fieldset.md-followup input[type=radio]:checked').count() == 0
+    assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_hidden()
+    dialog.get_by_label('기타(직접 입력)', exact=True).check()
+    assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_visible()
+    dialog.get_by_label('단기 추적검사', exact=True).check()
+    assert not dialog.get_by_label('기타(직접 입력)', exact=True).is_checked()
+    assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_hidden()
     assert dialog.locator('.md-viewpoint-options [value=attached]').is_disabled()
     dialog.locator('textarea').fill('SYNTHETIC browser note')
     page.keyboard.press('Escape')
@@ -67,7 +75,7 @@ with sync_playwright() as p:
       return JSON.parse(localStorage.getItem(key)).drafts['DEMO-WORKFLOW-001'];
     }''')
     # Automatic intent survives normalization; this synthetic case has no viewpoint.
-    assert restored == {'id':draft_id,'notes':'SYNTHETIC browser note','selected':[],'none':True,'viewpointChoice':'auto'}
+    assert restored == {'id':draft_id,'notes':'SYNTHETIC browser note','selected':[],'none':True,'viewpointChoice':'auto','followup':'short_term_followup'}
     page.keyboard.press('Escape')
     dialog.get_by_role('button', name='계속 작성').click()
     # Throw before persistence: failed send must leave draft and case pending.
@@ -86,6 +94,8 @@ with sync_playwright() as p:
     page.goto('http://127.0.0.1:4173/recipient.html')
     page.get_by_role('link', name='상세 보기', exact=True).first.click()
     page.locator('.md-record-memo').get_by_text('SYNTHETIC browser note', exact=True).wait_for()
+    # Opinion type is the first thing the receiving clinician reads.
+    assert page.locator('.md-record-memo p').first.inner_text() == '의견 유형 · 단기 추적검사'
     page.get_by_role('button', name='수신 확인 (진료 판단 아님)').click()
     page.reload()
     assert page.get_by_role('button', name='수신 확인됨', exact=False).is_disabled()
@@ -137,5 +147,21 @@ with sync_playwright() as p:
     for width in (1440,768,390,320):
         page.set_viewport_size({'width':width,'height':900})
         assert page.locator('#mdFilter').is_visible()
+    # 320px: the new opinion group must not hide the primary send action.
+    page.set_viewport_size({'width':320,'height':740})
+    card.get_by_role('button', name='주치의에게 전송하기').click()
+    dialog.get_by_label('단기 추적검사', exact=True).check()
+    geo = page.evaluate('''() => {
+      const dl=document.getElementById('mdSendDialog');
+      const send=[...dl.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='DEMO 보내기'||b.textContent.trim()==='✈');
+      const r=dl.getBoundingClientRect(), s=send?.getBoundingClientRect();
+      return {dialogH:Math.round(r.height), scrollH:dl.scrollHeight,
+        labelHeights:[...dl.querySelectorAll('fieldset.md-followup label')].map(l=>Math.round(l.getBoundingClientRect().height)),
+        docOverflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
+    }''')
+    assert geo['docOverflow'] <= 1, geo
+    assert len(geo['labelHeights']) == 4 and min(geo['labelHeights']) >= 44, geo
+    dialog.get_by_role('button', name='DEMO 보내기', exact=True).click()
+    assert not dialog.is_visible()
     browser.close()
 print('MD workflow browser behavioral checks passed')
