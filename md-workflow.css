@@ -303,6 +303,18 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 #mdSendDialog .md-layer-action .md-discard-confirm button { min-height:40px; }
 #mdSendDialog .md-candidate-rows { max-height:212px; overflow:auto; padding-right:2px; }
 @media(max-width:480px) { #mdSendDialog .md-layer-action { margin:22px -18px -22px; padding:10px 18px 14px; } }
+/* 중요도가 같은 선택지 행은 같은 열 그리드로 모아, 넓은 창에서 한 행에 남은 빈 폭을 두지 않는다. */
+@media(min-width:701px) {
+  #mdSendDialog .md-layer-decision .md-precheck,
+  #mdSendDialog .md-layer-decision .md-followup,
+  #mdSendDialog .md-layer-decision fieldset:not(.md-candidates):not(.md-precheck):not(.md-followup) { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; align-items:start; }
+  #mdSendDialog .md-layer-decision fieldset > legend,
+  #mdSendDialog .md-layer-decision fieldset > .md-precheck-caveat,
+  #mdSendDialog .md-layer-decision fieldset > .md-precheck-clear,
+  #mdSendDialog .md-layer-decision fieldset > .md-followup-hint,
+  #mdSendDialog .md-layer-decision fieldset > .md-biopsy { grid-column:1 / -1; }
+}
+
 
 /* Receiver side: protocol checklist and the series strip. */
 .md-record-protocol { margin:22px 0; padding:16px; border:1px dashed #cbc6dc; border-radius:10px; background:#fbfaff; }
