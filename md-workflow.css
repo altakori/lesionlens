@@ -110,7 +110,7 @@ body.md-recipient .md-record-ct-button:hover { background:#4e3498; color:#fff; }
 .md-canvas { width:min(100%,clamp(190px,calc((100vh - 330px)/2),400px)); margin:auto; }
 .md-viewer-controls { padding-bottom:10px; }
 body > footer { max-width:1220px; margin:8px auto 24px; padding:0 24px; font-size:12px; color:var(--md-muted); }
-#mdSendDialog > button:not(.md-send-close) { vertical-align:middle; min-height:48px; }
+#mdSendDialog > button:not(.md-send-close), #mdSendDialog .md-layer-action button:not(.md-send-close) { vertical-align:middle; min-height:48px; }
 #mdSendDialog .md-send-submit:disabled { background:#ddd9e7; color:#736b84; opacity:1; cursor:not-allowed; }
 @media(max-width:768px) { .md-case-card .md-metrics { display:block; width:100%; padding:0; margin:4px 0; } }
 @media(max-width:480px) { .md-canvas { width:100%; } }
@@ -286,6 +286,24 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 #mdSendDialog .md-biopsy-guide-line { font-size:12px; color:#4f5566; line-height:1.7; margin:6px 0 0; }
 #mdSendDialog .md-biopsy-guide-confirm { font-size:12px; color:#8a5a12; line-height:1.7; margin:6px 0 0; }
 #mdSendDialog .md-biopsy-guide-note { font-size:11px; color:var(--md-muted); margin:6px 0 0; }
+/* 3차 기획 멘토링 §11 "중요도가 다른 기능을 같은 수준으로 강조하지 않는다":
+   판단 입력(decision) / 함께 남는 정보(context) / 전송(action)을 다른 강조 수준으로 분리. */
+#mdSendDialog .md-send-id, #mdSendDialog .md-send-reason { color:var(--md-ink); font-weight:600; font-size:16px; line-height:1.45; }
+#mdSendDialog .md-layer h3 { font-size:15px; margin:26px 0 4px; padding-bottom:7px; border-bottom:1px solid var(--md-line); }
+#mdSendDialog .md-layer-hint { color:var(--md-muted); font-size:12px; margin:0 0 6px; }
+#mdSendDialog .md-layer-decision fieldset { border-color:#cdc4e2; }
+#mdSendDialog .md-layer-context h3 { font-size:13px; color:var(--md-muted); margin-top:30px; border-bottom:1px dashed var(--md-line); }
+#mdSendDialog .md-layer-context fieldset { border-style:dashed; border-color:#e2ddec; background:#fbfaff; margin:12px 0; padding:10px 14px; }
+#mdSendDialog .md-layer-context fieldset legend { font-size:12px; }
+#mdSendDialog .md-layer-context > p { color:var(--md-muted); font-size:13px; }
+#mdSendDialog .md-context-series { font-size:12px; line-height:1.65; margin:12px 0 0; }
+#mdSendDialog .md-layer-action { position:sticky; bottom:0; margin:26px -30px -30px; padding:12px 30px 16px; background:#fff; border-top:1px solid var(--md-line); box-shadow:0 -12px 22px #fff; }
+#mdSendDialog .md-demo-roles { color:var(--md-muted); font-size:11px; margin:6px 0 0; }
+#mdSendDialog .md-layer-action .md-discard-confirm { margin:12px 0 0; }
+#mdSendDialog .md-layer-action .md-discard-confirm button { min-height:40px; }
+#mdSendDialog .md-candidate-rows { max-height:212px; overflow:auto; padding-right:2px; }
+@media(max-width:480px) { #mdSendDialog .md-layer-action { margin:22px -18px -22px; padding:10px 18px 14px; } }
+
 /* Receiver side: protocol checklist and the series strip. */
 .md-record-protocol { margin:22px 0; padding:16px; border:1px dashed #cbc6dc; border-radius:10px; background:#fbfaff; }
 .md-record-protocol h3 { font-size:15px; margin-bottom:8px; }

@@ -96,12 +96,12 @@
     const savedDraft=state.drafts[c.id];
     let draft=M.normalizeDraft(c,savedDraft);
     if(savedDraft === undefined)draft.viewpointChoice='auto';
-    const baseline=JSON.stringify(draft);let busy=false, researchEnvelope=null, focusAfterClose=null;
+    const baseline=JSON.stringify(draft);let busy=false, researchEnvelope=null, focusAfterClose=null, optInNodes=null;
     const error=el('p');error.setAttribute('role','alert');
     const persist=()=>{syncReferences();try{records.draft(c.id,draft);error.textContent='초안 로컬 저장됨 · 실제 전송 아님';}catch(_){error.textContent='초안 저장 실패 · 이 창의 입력을 유지합니다.';}};
     const close=()=>{if(busy)return;if(JSON.stringify(draft)!==baseline||draft.notes||draft.selected.length){confirm.hidden=false;confirm.focus();return;}dialog.close();};
     const x=action('×',close);x.title='전송 취소 및 닫기';x.setAttribute('aria-label','전송 취소 및 닫기');x.className='md-send-close';
-    const legacyDemo=M.eligible(c);let allowed=legacyDemo;const title=el('h2','주치의에게 전송하기'+(allowed?' · DEMO ONLY':' · 보내기 미연결'));title.id='mdSendTitle';dialog.setAttribute('aria-labelledby',title.id);dialog.append(x,title,el('p',c.id),el('p',allowed?`수신: ${c.mapping.recipientId} · ${c.mapping.department} · 합성 환자 ${c.mapping.patientId}`:'수신 담당자 미연결 · 승인된 환자–임상과 주치의/담당 의료진 매핑 없음 · 병리학과 제외'),el('p','AI 분석 요약: 생성형 AI 소견 없음'),el('p',M.reason(e)));
+    const legacyDemo=M.eligible(c);let allowed=legacyDemo;const title=el('h2','주치의에게 전송하기'+(allowed?' · DEMO ONLY':' · 보내기 미연결'));title.id='mdSendTitle';dialog.setAttribute('aria-labelledby',title.id);dialog.append(x,title,el('p',c.id,'md-send-id'),el('p',allowed?`수신: ${c.mapping.recipientId} · ${c.mapping.department} · 합성 환자 ${c.mapping.patientId}`:'수신 담당자 미연결 · 승인된 환자–임상과 주치의/담당 의료진 매핑 없음 · 병리학과 제외'),el('p','AI 분석 요약: 생성형 AI 소견 없음'),el('p',M.reason(e),'md-send-reason'));
     if(!legacyDemo){
       const optLabel=el('label','LOCAL DEMO로 연구 CT를 로컬 전달하기 (실제 환자/주치의 연결·병원 전송 아님)','md-demo-opt-in');
       const opt=el('input');opt.type='checkbox';opt.checked=false;opt.disabled=!sourceContext;
@@ -115,7 +115,7 @@
         syncReferences();
       };
       optLabel.prepend(opt);const demoRole=el('p','실제 임상 전송 차단 · 로컬 DEMO를 선택하면 이 브라우저에만 저장됩니다.','md-demo-roles');
-      dialog.append(optLabel,demoRole);
+      optInNodes=[optLabel,demoRole];dialog.append(...optInNodes);
     }
     const precheck=el('fieldset',null,'md-precheck');precheck.append(el('legend','사전 의견  ·  선택 입력 · 미작성 시 미기록'));
     precheck.append(el('p','이 창은 재검토 목록의 모델 불일치 신호를 이미 표시합니다. 따라서 이 항목은 AI를 보기 전의 독립적 판단이 아니라, 전송 시점에 남기는 MD의 참고 기록입니다.','md-precheck-caveat'));
@@ -124,17 +124,17 @@
     precheckClear.disabled=draft.precheck===undefined;precheckClear.className='md-precheck-clear';precheck.append(precheckClear);dialog.append(precheck);
     // Model pairs repeat the same candidate; collapse to one row per candidate and
     // let the row drive the CT marker layer instead of leaving the list as text only.
-    const candidates=M.reviewCandidates(e);let activeCandidate=null;
+    let candidateBox=null;const candidates=M.reviewCandidates(e);let activeCandidate=null;
     if(candidates.length){
       const box=el('fieldset',null,'md-candidates');
       box.append(el('legend',`재검토 후보 ${candidates.length}건 · 모델 쌍 ${e.reasons.length}행을 후보 단위로 합침 · 행을 누르면 CT에 표시`));
-      const rows={};
+      const rows={};const rowWrap=el('div',null,'md-candidate-rows');
       for(const k of candidates){
         const b=action(M.candidateLabel(k),()=>{activeCandidate=activeCandidate===k.candidateId?null:k.candidateId;paintCandidates();});
         b.className='md-candidate-row';b.dataset.candidateId=k.candidateId;b.setAttribute('aria-pressed','false');
         const who=[(k.model&&M.labels[k.model])||'알 수 없는 모델',k.pairs.map(p=>M.labels[p]||p).join(', ')||'상대 모델 기록 없음'].join(' ↔ ');
         b.title=who+' · voxel '+(k.voxel.length?k.voxel.join(', '):'기록 없음');
-        rows[k.candidateId]=b;box.append(b);
+        rows[k.candidateId]=b;rowWrap.append(b);
       }
       const candidateNote=el('p',null,'md-candidate-note');candidateNote.setAttribute('role','status');
       // The dialog covers the CT behind it, so the marker has to render in here too.
@@ -146,7 +146,7 @@
       const previewFrame=el('div',null,'md-candidate-frame');previewFrame.append(previewImg,previewMark);
       const previewCap=el('figcaption','후보를 고르면 이 절편의 CT에 후보 위치를 표시합니다. 표시 전용이며 HU·진단 정보가 아닙니다.','md-candidate-caption');
       preview.append(previewFrame,previewCap);
-      box.append(candidateNote,preview);dialog.append(box);
+      box.append(rowWrap,candidateNote,preview);candidateBox=box;dialog.append(box);
       async function paintPreview(k){
         if(!k||k.slice===null||!c.slices?.[k.slice]?.ct){previewImg.hidden=true;previewMark.hidden=true;previewCap.textContent='절편 정보가 없어 미리보기를 표시하지 않습니다. 표시 전용이며 진단 정보가 아닙니다.';return;}
         previewImg.src='/'+c.slices[k.slice].ct.replace(/^\/+/, '');
@@ -277,7 +277,7 @@
       const result=doc.getElementById('mdSendResult');result.replaceChildren();
       const link=el('a','보낸 사례 상세 보기','md-sent-record-link');link.href=M.recordLink(scope,record.id);
       result.append(el('p',`${record.case.id} · 로컬 전달 저장됨`),link);focusAfterClose=link;link.focus();
-    }catch(_){error.textContent='전송 저장 실패 또는 선택 오류 · 입력 유지 · 다시 시도하세요.';}finally{busy=false;syncReferences();}});send.disabled=!allowed;send.className='md-send-submit';send.title=allowed?'로컬 DEMO 수신함에 저장':'승인된 수신 담당자 미연결 · 보내기 불가';send.setAttribute('aria-label',allowed?'DEMO 보내기':'보내기 불가 · 수신 담당자 미연결');dialog.append(send,action('취소',close));
+    }catch(_){error.textContent='전송 저장 실패 또는 선택 오류 · 입력 유지 · 다시 시도하세요.';}finally{busy=false;syncReferences();}});send.disabled=!allowed;send.className='md-send-submit';send.title=allowed?'로컬 DEMO 수신함에 저장':'승인된 수신 담당자 미연결 · 보내기 불가';send.setAttribute('aria-label',allowed?'DEMO 보내기':'보내기 불가 · 수신 담당자 미연결');const cancel=action('취소',close);dialog.append(send,cancel);
     function syncReferences(){
       Object.assign(draft,M.normalizeReferences(c,draft.selected,draft.none));
       for(const key of M.models)checks[key].checked=draft.selected.includes(key);
@@ -288,7 +288,25 @@
     }
     syncReferences();
     if(JSON.stringify(savedDraft)!==JSON.stringify(draft) && (savedDraft !== undefined || draft.viewpoint))persist();
-    const confirm=el('section',null,'md-discard-confirm');confirm.hidden=true;confirm.tabIndex=-1;confirm.setAttribute('role','alert');confirm.append(el('p','작성한 초안을 폐기할까요?'),action('계속 작성',()=>{confirm.hidden=true;notes.focus();}),action('초안 보관하고 닫기',()=>{syncReferences();try{records.draft(c.id,draft);dialog.close();}catch(_){error.textContent='초안 저장 실패 · 닫지 않았습니다.';}}),action('폐기하고 닫기',()=>{try{records.discard(c.id);dialog.close();}catch(_){error.textContent='초안 폐기 실패';}}));dialog.append(confirm);
+    // 3차 기획 멘토링 §11 "중요도가 다른 기능을 같은 수준으로 강조하지 않는다"와
+    // 32:46-38:06 "유저 플로우 -> 정보 중요도 -> 배치/강조"를 따라 모달을 세 레이어로
+    // 나눈다. 같은 레이어 안의 항목은 서로 같은 강조 수준을 쓰고, 레이어 순서가
+    // 판단 흐름(입력 -> 함께 남는 정보 -> 전송)을 따라간다. 노드는 재부착된다.
+    const decision=el('section',null,'md-layer md-layer-decision');
+    decision.append(el('h3','전달 판단  ·  MD가 직접 입력'),el('p','필수: 참고 모델과 전송 가능 여부 · 선택: 사전 의견·추가 메모','md-layer-hint'));
+    if(optInNodes)decision.append(...optInNodes);
+    if(candidateBox)decision.append(candidateBox);
+    decision.append(group,precheck,followup,notesWrap);
+    const context=el('section',null,'md-layer md-layer-context');
+    context.append(el('h3','전달에 함께 남는 정보  ·  판단 입력보다 낮은 수준'));
+    context.append(viewpointGroup,visitBox);
+    const seriesInfo=M.seriesFor(c);
+    const seriesOthers=seriesInfo?seriesInfo.studies.filter(s=>s.relation!=='current').length:0;
+    if(seriesOthers)context.append(el('p',`이 환자 검사 시리즈: ${M.seriesSummary(c)} · ${seriesInfo.basis} · 촬영일은 시연용 가정값 · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
+    const actionLayer=el('section',null,'md-layer md-layer-action');
+    actionLayer.append(error,send,cancel);
+    dialog.append(decision,context,actionLayer);
+    const confirm=el('section',null,'md-discard-confirm');confirm.hidden=true;confirm.tabIndex=-1;confirm.setAttribute('role','alert');confirm.append(el('p','작성한 초안을 폐기할까요?'),action('계속 작성',()=>{confirm.hidden=true;notes.focus();}),action('초안 보관하고 닫기',()=>{syncReferences();try{records.draft(c.id,draft);dialog.close();}catch(_){error.textContent='초안 저장 실패 · 닫지 않았습니다.';}}),action('폐기하고 닫기',()=>{try{records.discard(c.id);dialog.close();}catch(_){error.textContent='초안 폐기 실패';}}));actionLayer.append(confirm);
     dialog.oncancel=event=>{event.preventDefault();close();};dialog.onclick=event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}};
     dialog.onclose=()=>{try{getViewer()?.setCandidates([],null);}catch(_){}unsubscribe?.();try{state=readState();}catch(_){}if(focusAfterClose?.isConnected)focusAfterClose.focus();else if(trigger.isConnected)trigger.focus();else filter.focus();};dialog.showModal();notes.focus();
   }
