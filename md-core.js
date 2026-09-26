@@ -254,67 +254,67 @@
     for (const ch of c.id) hash = ((hash ^ ch.codePointAt(0)) * 16777619) >>> 0;
     return visitOptions[hash % visitOptions.length];
   }
-  // Prior-study pairing for the local demo. LL-CT-001 is a slice-window crop of the
-  // same LiTS source volume as case_000 (see data/real_cases/LOCAL_PROVENANCE.json),
-  // so it is a real derived pair, but it is NOT a verified earlier exam of a patient
-  // and every acquisition date here is a demo placeholder. The integrated server's
-  // exact asset allowlist does not publish data/real_cases yet, so the receiver side
-  // shows this pairing as metadata and refuses to open the images rather than
-  // substituting another case's CT.
-  const priorStudies = {
-    case_000:{alias:'LL-CT-001', manifestPath:'data/real_cases/manifest.json',
-      basis:'같은 원본 볼륨(sourceCaseId 000)에서 절편 50–73만 잘라 만든 시연용 짝 · 환자 검사가 아님',
-      assumedDate:'2026-05-14'}
-  };
-  function priorStudyFor(c) {
-    const entry = c && priorStudies[c.id];
-    if (!entry) return null;
-    return {kind:'demo-prior-study-v1', caseId:c.id, alias:entry.alias, manifestPath:entry.manifestPath,
-      basis:entry.basis, assumedDate:entry.assumedDate, dateIsAssumed:true};
-  }
-  // Simulated patient series for the reading screen. The demo manifest carries no
-  // patient identity, so studies are grouped by acquisition geometry (voxel spacing)
-  // and given assumed dates: a same-spacing pair is plausible as one patient's
-  // earlier and later exam, but the grouping is demo scaffolding, not verified
-  // identity, and no date here is real. It is a stable function of the case id, so a
-  // reload cannot reshuffle which exam counts as "previous" mid-review.
+  // 검사 식별은 자산 옆에 이미 있는 receipt에서 가져온다. 획득 지표로 환자를 추정하지
+  // 않는다. data/capp_cases/source-receipt.json(source capp:Dataset003_Liver),
+  // data/model_compare/source-index.json, data/real_cases/LOCAL_PROVENANCE.json은 각 CT
+  // 이미지의 SHA-256을 고정해 두었으므로, 해시가 같은 두 별칭은 "이전·다음 검사"가 아니라
+  // 같은 검사의 다른 표시다. receipt에 image 해시가 없는 case는 신원을 모른 채로 두고
+  // 어떤 그룹에도 넣지 않는다.
   const seriesManifestPath = 'data/model_compare/manifest.json';
+  const realCasesManifestPath = 'data/real_cases/manifest.json';
   const seriesRelations = {prior:'이전 CT', current:'이 검사', next:'다음 CT'};
-  const seriesGroups = [
-    {patientId:'DEMO-P-01', basis:'voxel spacing 0.70×0.70×5.0 / 0.68×0.68×5.0 · 같은 획득 프로토콜로 추정',
-      studies:[
-        {alias:'LL-CT-001', manifestPath:'data/real_cases/manifest.json', assumedDate:'2026-04-30',
-          basis:'같은 원본 볼륨(sourceCaseId 000)에서 절편 50–73만 잘라 만든 시연용 짝 · 환자 검사가 아님'},
-        {alias:'case_000', manifestPath:seriesManifestPath, assumedDate:'2026-05-14'},
-        {alias:'case_001', manifestPath:seriesManifestPath, assumedDate:'2026-09-02'}]},
-    {patientId:'DEMO-P-02', basis:'voxel spacing 1.0×1.0×1.0 · 같은 획득 프로토콜로 추정',
-      studies:[{alias:'case_045', manifestPath:seriesManifestPath, assumedDate:'2026-06-20'},
-        {alias:'case_035', manifestPath:seriesManifestPath, assumedDate:'2026-09-10'}]},
-    {patientId:'DEMO-P-03', basis:'voxel spacing 0.98×0.98×2.5 · 이 검사만 확인',
-      studies:[{alias:'case_048', manifestPath:seriesManifestPath, assumedDate:'2026-09-18'}]}
+  const studyReceipts = [
+    {alias:'case_000', manifestPath:seriesManifestPath, sourceCaseId:'case_000', imageSha256:'5b41a5c4065094a3a8af45c01d49852d6ae5a215cc7807c318aef2744eb125f1'},
+    {alias:'case_001', manifestPath:seriesManifestPath, sourceCaseId:'case_001', imageSha256:'df5adbd92a7decb53f715b7ff053b0591b2533ea99f7464ff38904ee2b1c2f2c'},
+    {alias:'case_035', manifestPath:seriesManifestPath, sourceCaseId:'case_035', imageSha256:'8e84fc0059e6622fa876def0e7d88b796b04935058004ddbebcb606f19fb9145'},
+    {alias:'case_045', manifestPath:seriesManifestPath, sourceCaseId:'case_045', imageSha256:'1f63e67495bcf5520703500dcbe2cdcd4efc2885e974e5d6120fe6e22e157ff6'},
+    {alias:'case_048', manifestPath:seriesManifestPath, sourceCaseId:'case_048', imageSha256:'3bd3a7473595b1b637defd4e0662a3ef88db1ba5ab864ee467343342cc380660'},
+    {alias:'LL-CT-001', manifestPath:realCasesManifestPath, sourceCaseId:'000', imageSha256:'5b41a5c4065094a3a8af45c01d49852d6ae5a215cc7807c318aef2744eb125f1'},
+    {alias:'LL-CT-002', manifestPath:realCasesManifestPath, sourceCaseId:'131', imageSha256:'3009c1e9b72345dca96fd6bbf169416e53f6d699747784812b1f31e212572b1c'},
+    {alias:'LL-CT-003', manifestPath:realCasesManifestPath, sourceCaseId:'045', imageSha256:'1f63e67495bcf5520703500dcbe2cdcd4efc2885e974e5d6120fe6e22e157ff6'}
   ];
+  // Dataset003_Liver(=LiTS)는 환자당 CT 1건에 환자 키를 주지 않으므로, 로컬 자산에는 같은
+  // 환자의 이전·다음 검사가 없다. ai0에 실제 다중 검사 자료(3D-IRCADb-01, 환자당 동맥·정맥
+  // 2검사 20명)가 있지만 external_data_quarantine에 격리되어 있고 CC BY-NC-ND 재배포 금지에
+  // DICOM PatientName·PatientBirthDate가 채워진 상태라, 비식별·사용조건 결정 전에는 쓰지 않는다.
+  function studyReceipt(alias) { return studyReceipts.find(r => r.alias === alias) || null; }
+  function duplicateStudies(c) {
+    const r = studyReceipt(c && c.id);
+    if (!r) return [];
+    return studyReceipts.filter(x => x !== r && x.imageSha256 === r.imageSha256)
+      .map(x => ({alias:x.alias, manifestPath:x.manifestPath, sourceCaseId:x.sourceCaseId,
+        reason:'image sha256 동일'}));
+  }
+  function studyIdentityKey(c) {
+    const r = studyReceipt(c && c.id);
+    return r ? 'sha:' + r.imageSha256 : 'unknown:' + (c && c.id);
+  }
   function seriesFor(c) {
     if (!c || c.synthetic || typeof c.id !== 'string' || !c.id) return null;
-    const group = seriesGroups.find(one => one.studies.some(s => s.alias === c.id));
-    if (!group) return {kind:'demo-series-v1', patientId:null,
-      basis:'시연 자료에서 같은 프로토콜의 다른 검사를 찾지 못했습니다.', currentIndex:0,
-      studies:[{alias:c.id, manifestPath:seriesManifestPath, assumedDate:null, dateIsAssumed:false,
-        relation:'current', label:seriesRelations.current, viewable:true}]};
-    const currentIndex = group.studies.findIndex(s => s.alias === c.id);
-    const studies = group.studies.map((s,i) => ({alias:s.alias, manifestPath:s.manifestPath,
-      assumedDate:s.assumedDate, dateIsAssumed:true,
-      relation:i === currentIndex ? 'current' : i < currentIndex ? 'prior' : 'next',
-      label:i === currentIndex ? seriesRelations.current : i < currentIndex ? seriesRelations.prior : seriesRelations.next,
-      // Only a study published under this server's own asset root can be opened here.
-      viewable:s.manifestPath === seriesManifestPath, ...(s.basis ? {basis:s.basis} : {})}));
-    return {kind:'demo-series-v1', patientId:group.patientId, basis:group.basis, currentIndex, studies};
+    const r = studyReceipt(c.id);
+    return {kind:'study-series-v2', patientId:null,
+      patientIdBasis:'Dataset003_Liver는 환자당 CT 1건 · 환자 키 없음',
+      basis:'검사 식별은 image sha256 receipt 기준 · 같은 환자의 다른 검사는 이 데이터셋에 없음',
+      currentIndex:0,
+      studies:[{alias:c.id, relation:'current', label:seriesRelations.current,
+        viewable:!r || r.manifestPath === seriesManifestPath}],
+      duplicates:duplicateStudies(c)};
   }
   function seriesSummary(c) {
     const s = seriesFor(c);
     if (!s) return '';
-    const prior = s.studies.filter(k => k.relation === 'prior').length;
-    const next = s.studies.filter(k => k.relation === 'next').length;
-    return `${s.patientId || '시리즈 미확인'} · 이전 ${prior}건 · 이 검사 · 다음 ${next}건`;
+    return s.duplicates.length
+      ? `이 검사 1건 · 같은 검사의 복제 표시 ${s.duplicates.map(d => d.alias).join(', ')}`
+      : '이 검사 1건 · 이전·다음 검사 미확인';
+  }
+  // priorStudy는 기존 전송 기록이 이미 들고 있는 필드명이라 이름만 유지한다. 내용은
+  // "이전 검사"가 아니라 같은 검사의 복제 표시로 바뀐다.
+  function priorStudyFor(c) {
+    const dup = duplicateStudies(c).find(d => d.manifestPath !== seriesManifestPath);
+    if (!dup) return null;
+    return {kind:'same-study-asset-v2', caseId:c.id, alias:dup.alias, manifestPath:dup.manifestPath,
+      basis:`image sha256이 동일한 같은 검사의 복제 표시(sourceCaseId ${dup.sourceCaseId}) · 이전 검사가 아님`,
+      sameStudy:true, dateIsAssumed:false};
   }
   function biopsyCandidateLabel(v) {
     if (v === undefined) return '이 전송에는 조직검사 후보가 기록되지 않았습니다.';
@@ -330,16 +330,19 @@
   }
   function queue(cases, evidence, state, filter='pending', search='') {
     const sent = new Set(Object.values(state.sends).map(r => r.case.id));
-    return cases.filter(c => c.id.toLowerCase().includes(search.toLowerCase()) &&
+    const ordered = cases.filter(c => c.id.toLowerCase().includes(search.toLowerCase()) &&
       (filter === 'all' || filter === 'pending' && !state.reviews[c.id] || filter === 'reviewed' && state.reviews[c.id] || filter === 'sent' && sent.has(c.id)))
       .sort((a,b) => Number(!!evidence[b.id]?.reasons.length) - Number(!!evidence[a.id]?.reasons.length) || a.id.localeCompare(b.id));
+    // 같은 검사가 카드로 두 번 뜨지 않게, image sha256가 같은 별칭은 앞에 정렬된 하나만 남긴다.
+    const seen = new Set();
+    return ordered.filter(c => { const key = studyIdentityKey(c); if (seen.has(key)) return false; seen.add(key); return true; });
   }
   async function digest(text) {
     const hash = await g.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
   }
   const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,reviewCandidates,candidateLabel,biopsyCandidateLabel,
-    visitOptions,visitLabels,visitLabel,visitStatus,priorStudies,priorStudyFor,
+    visitOptions,visitLabels,visitLabel,visitStatus,studyReceipts,duplicateStudies,studyIdentityKey,priorStudyFor,
     biopsyProtocolOptions,biopsyProtocolLabels,biopsyProtocolLabel,protocolGuide,seriesFor,seriesSummary,seriesRelations,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);

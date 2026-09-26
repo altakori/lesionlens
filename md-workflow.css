@@ -171,6 +171,7 @@ body[data-md-workflow="true"] .topbar{padding:12px max(24px,calc((100vw - 1160px
 #mdList .md-series-status{display:block;margin:4px 0 0;font-size:11px;color:#5f6472;overflow-wrap:anywhere}
 #mdList .md-series-status:empty{display:none}
 #mdList .md-series-note{display:block;margin:2px 0 0;font-size:11px;color:#83889a;line-height:1.5}
+#mdList .md-series-dup{flex:1 1 100%;margin:2px 0 0;font-size:11px;color:#7a7f8e;line-height:1.5;overflow-wrap:anywhere}
 @media(max-width:560px){#mdList .md-series-date{display:none}}
 /* One CT-only panel, so the box hugs the canvas instead of sitting in a full-width tray. */
 #mdList .md-series-viewer{display:block;width:min(100%,462px);max-width:100%;margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#f3f4f9}
@@ -337,4 +338,5 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 .md-record-series-status { font-size:12px; color:#626879; margin:10px 0; }
 .md-record-series-viewer { margin-top:12px; }
 .md-record-series-note { font-size:12px; color:#656b7b; line-height:1.7; margin:8px 0 0; }
+.md-record-series-dup { flex:1 1 100%; font-size:12px; color:#656b7b; margin:8px 0 0; line-height:1.6; }
 @media(max-width:480px) { .md-series { padding:10px; } .md-series-chip,.md-series-current { width:100%; } }

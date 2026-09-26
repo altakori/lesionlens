@@ -27,16 +27,17 @@
       const values=s?[M.labels[k],s.componentCount,s.maxVolumeMl??Math.max(0,...s.componentVolumesMl),s.totalVolumeMl??s.volumeMl]:[M.labels[k],'자료 없음','—','—'];
       values.forEach(v=>row.append(el('td',typeof v==='number'?String(Number(v.toFixed(4))):v)));table.append(row);}
     d.append(table,el('p','생성형 AI 소견 없음 · 진단/악성/전이/응급도는 판단하지 않습니다.'),el('p','별도 Radiomics 자료는 아래 보조 영역에서 확인합니다. 데이터셋 자동 매칭 없음.'));return d;}
-  // Patient series next to the reading controls. The grouping itself is a demo
-  // assumption (MD.seriesFor), so identity stays labelled unverified and dates stay
-  // labelled assumed. Studies this server does not publish fail closed with a reason.
+  // Study list next to the reading controls. Identity comes from the image sha256
+  // receipts (MD.studyReceipts), not from a guessed patient, so there are no assumed
+  // dates here. A duplicate alias of the same acquisition is named once as text and
+  // never mounted as a second study. Studies this server does not publish fail closed.
   function seriesBlock(c){
     const series=M.seriesFor(c);
     // The synthetic workflow case has no CT at all, so it gets no box rather than an
     // empty framed placeholder.
     if(!series)return null;
     const box=el('div',null,'md-series-wrap'),bar=el('div',null,'md-series');
-    const title=el('p','환자 시리즈(시연 가정) · '+M.seriesSummary(c),'md-series-title');
+    const title=el('p','검사 시리즈 · '+M.seriesSummary(c),'md-series-title');
     const chips=el('div',null,'md-series-chips');
     const note=el('p','','md-series-status');note.setAttribute('role','status');
     const host=el('div',null,'md-series-viewer');host.hidden=true;
@@ -48,6 +49,7 @@
       chip.append(el('span',study.label+' · '+study.alias));
       // The assumed date is duplicated in the note, so narrow widths drop it first.
       if(study.assumedDate)chip.append(el('span',' · '+study.assumedDate+'(가정)','md-series-date'));
+      else chip.title=study.alias+' · '+study.label+' · 이 서버가 공개한 자산만 열립니다';
       chip.type='button';chip.className='md-series-chip';chip.dataset.seriesRelation=study.relation;
       chip.onclick=()=>{
         const other=cases.find(x=>x.id===study.alias);
@@ -56,11 +58,13 @@
         shown=g.MDViewer.mount(host,other,['ct']);views.push(shown);host.hidden=false;
         host.querySelector('canvas')?.setAttribute('aria-label',study.alias+' '+study.label+' · CT만 표시 · 모델 오버레이 없음 · 방향키 절편 이동');
         if(Number.isInteger(other.defaultSlice))shown.setSlice(other.defaultSlice);
-        note.textContent=study.alias+' · '+other.slices.length+'절편 · CT만 표시 · 동일 환자 신원 미검증 · 표시 촬영일 '+study.assumedDate+'(가정)';
+        note.textContent=study.alias+' · '+other.slices.length+'절편 · CT만 표시'+(study.assumedDate?' · 표시 촬영일 '+study.assumedDate+'(가정)':'');
       };
       chips.append(chip);
     }
-    bar.append(title,chips,note,el('p',series.basis+' · 동일 환자 신원 미검증 · 촬영일은 시연 가정값 · 경과 판단에 쓰지 마세요','md-series-note'));
+    // 같은 검사의 복제 별칭은 두 번째 검사가 아니므로 목록에 다시 띄우지 않고 한 줄로만 알린다.
+    if(series.duplicates&&series.duplicates.length)chips.append(el('p','같은 검사가 화면에 다시 뜨지 않습니다. 복제 표시: '+series.duplicates.map(d=>d.alias+' · '+d.reason).join(', '),'md-series-dup'));
+    bar.append(title,chips,note,el('p',series.basis+(series.patientIdBasis?' · '+series.patientIdBasis:'')+' · 경과 판단에 쓰지 마세요','md-series-note'));
     // The study viewer is a sibling of the status bar, so opening a study never
     // stretches the bar itself.
     box.append(bar,host);
@@ -302,7 +306,8 @@
     context.append(viewpointGroup,visitBox);
     const seriesInfo=M.seriesFor(c);
     const seriesOthers=seriesInfo?seriesInfo.studies.filter(s=>s.relation!=='current').length:0;
-    if(seriesOthers)context.append(el('p',`이 환자 검사 시리즈: ${M.seriesSummary(c)} · ${seriesInfo.basis} · 촬영일은 시연용 가정값 · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
+    if(seriesOthers)context.append(el('p',`이 환자 검사 시리즈: ${M.seriesSummary(c)} · ${seriesInfo.basis} · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
+    else if(seriesInfo&&seriesInfo.duplicates&&seriesInfo.duplicates.length)context.append(el('p',`같은 검사가 이 창에 다시 표시되지 않습니다. 복제 표시: ${seriesInfo.duplicates.map(d=>d.alias+' · '+d.reason).join(', ')} · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
     const actionLayer=el('section',null,'md-layer md-layer-action');
     actionLayer.append(error,send,cancel);
     dialog.append(decision,context,actionLayer);

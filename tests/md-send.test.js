@@ -276,29 +276,33 @@ test('biopsy protocol checklist is demo wording that routes to institutional con
  assert.equal(M.normalizeDraft(M.demo,draft()).biopsyProtocol,undefined);
 });
 
-test('patient series is a geometry-based demo grouping with assumed dates, never verified identity',async()=>{
+test('study series names one study per case from the image sha256 receipt and invents no patient and no date',async()=>{
  const {c,cases,context,scope}=await setup(),s=M.store(memory(),scope);
  const s0=M.seriesFor(c);
- assert.equal(s0.patientId,'DEMO-P-01');
- assert.deepEqual(s0.studies.map(k=>k.relation),['prior','current','next']);
- assert.deepEqual(s0.studies.map(k=>k.alias),['LL-CT-001','case_000','case_001']);
- assert.deepEqual(s0.studies.map(k=>k.viewable),[false,true,true]);
- assert.deepEqual(s0.studies.map(k=>k.dateIsAssumed),[true,true,true]);
- assert.match(s0.basis,/같은 획득 프로토콜로 추정/);
- assert.equal(M.seriesSummary(c),'DEMO-P-01 · 이전 1건 · 이 검사 · 다음 1건');
+ assert.equal(s0.kind,'study-series-v2');assert.equal(s0.patientId,null);
+ assert.match(s0.basis,/image sha256 receipt/);assert.match(s0.patientIdBasis,/환자 키 없음/);
+ assert.deepEqual(s0.studies.map(k=>k.alias),['case_000']);
+ assert.deepEqual(s0.studies.map(k=>k.relation),['current']);
+ assert.deepEqual(s0.studies.map(k=>k.viewable),[true]);
+ assert.ok(!('assumedDate' in s0.studies[0])&&!('dateIsAssumed' in s0.studies[0]));
+ // Aliases of the same acquisition are duplicates of this study, not another exam.
+ assert.deepEqual(s0.duplicates.map(d=>d.alias),['LL-CT-001']);
+ assert.equal(s0.duplicates[0].reason,'image sha256 동일');
+ assert.equal(M.seriesSummary(c),'이 검사 1건 · 같은 검사의 복제 표시 LL-CT-001');
  // The pairing must not move when the same case is read again.
  assert.deepEqual(M.seriesFor({id:c.id}),s0);
- const last=cases.find(x=>x.id==='case_001');
- assert.deepEqual(M.seriesFor(last).studies.map(k=>k.relation),['prior','prior','current']);
- const pair2=cases.find(x=>x.id==='case_045');
- assert.deepEqual(M.seriesFor(pair2).studies.map(k=>k.label),['이 검사','다음 CT']);
- assert.deepEqual(M.seriesFor(cases.find(x=>x.id==='case_048')).studies.map(k=>k.relation),['current']);
- assert.equal(M.seriesFor(M.demo),null);
+ assert.deepEqual(M.duplicateStudies(cases.find(x=>x.id==='case_045')).map(d=>d.alias),['LL-CT-003']);
+ assert.deepEqual(M.duplicateStudies(cases.find(x=>x.id==='case_035')),[]);
+ assert.equal(M.seriesSummary(cases.find(x=>x.id==='case_035')),'이 검사 1건 · 이전·다음 검사 미확인');
+ // An asset with no receipt stays unidentified and is never grouped with another study.
+ assert.equal(M.studyIdentityKey({id:'case_004'}),'unknown:case_004');
+ assert.notEqual(M.studyIdentityKey({id:'case_004'}),M.studyIdentityKey({id:'case_000'}));
  const record=s.send(c,draft('series-send'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
  assert.deepEqual(record.series,s0);
  // The synthetic workflow case has no CT, so no series is attached to its record.
  const synthetic=M.store(memory(),'demo-only-v1').send(M.demo,{...draft('series-synthetic'),selected:[],none:true},null,'DEMO');
  assert.equal(synthetic.dataKind,'synthetic-no-ct');assert.equal(synthetic.series,null);
+ assert.equal(M.seriesFor(M.demo),null);
 });
 
 test('outpatient request is accepted only for a not-visited demo case and stored as a request, not a send',async()=>{
@@ -318,13 +322,24 @@ test('outpatient request is accepted only for a not-visited demo case and stored
  assert.equal(M.visitLabel('admitted_yesterday'),'읽을 수 없는 내원 정보');
 });
 
-test('prior study pairing is a labelled demo crop of the same source volume, never a patient history',async()=>{
+test('priorStudy only names a duplicate alias of the same acquisition and never claims an earlier exam',async()=>{
  const {c,cases,context,scope}=await setup(),s=M.store(memory(),scope);
  const p=M.priorStudyFor(c);
- assert.equal(p.caseId,'case_000');assert.equal(p.alias,'LL-CT-001');assert.equal(p.dateIsAssumed,true);
- assert.equal(p.manifestPath,'data/real_cases/manifest.json');assert.match(p.basis,/환자 검사가 아님/);
+ assert.equal(p.kind,'same-study-asset-v2');assert.equal(p.sameStudy,true);
+ assert.equal(p.caseId,'case_000');assert.equal(p.alias,'LL-CT-001');assert.equal(p.dateIsAssumed,false);
+ assert.ok(!('assumedDate' in p));
+ assert.equal(p.manifestPath,'data/real_cases/manifest.json');assert.match(p.basis,/이전 검사가 아님/);
  assert.deepEqual(s.send(c,draft('prior-send'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)).priorStudy,p);
- const other=cases.find(x=>x.id!=='case_000');
- assert.equal(M.priorStudyFor(other),null);
- assert.equal(s.send(other,draft('prior-other'),null,'LOCAL_DEMO',M.localDemoEnvelope(other,context,true)).priorStudy,null);
+ const dupless=cases.find(x=>x.id==='case_035');
+ assert.equal(M.priorStudyFor(dupless),null);
+ assert.equal(s.send(dupless,draft('prior-other'),null,'LOCAL_DEMO',M.localDemoEnvelope(dupless,context,true)).priorStudy,null);
+});
+
+test('queue publishes one card per study even when two aliases share the same image sha256',()=>{
+ assert.equal(M.studyIdentityKey({id:'LL-CT-001'}),M.studyIdentityKey({id:'case_000'}));
+ const q=M.queue([{id:'case_000'},{id:'case_035'},{id:'LL-CT-001'}],{},{sends:{},reviews:{}},'all','');
+ assert.equal(q.filter(x=>x.id==='case_000'||x.id==='LL-CT-001').length,1);
+ assert.equal(q.length,2);
+ // Unknown identity is never collapsed, so an asset without a receipt always keeps its card.
+ assert.equal(M.queue([{id:'case_004'},{id:'case_010'}],{},{sends:{},reviews:{}},'all','').length,2);
 });

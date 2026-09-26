@@ -169,21 +169,18 @@ with sync_playwright() as p:
         real.get_by_role('button', name='CT 확대', exact=True).click()
         inline = real.locator('.md-inline-viewer')
         assert inline.locator('canvas').count() == 4
-        # A per-patient study series strip sits beside the reading controls. The
-        # grouping is a demo assumption, and a study this server does not publish has
-        # to fail closed instead of substituting another case's CT.
+        # A per-case study strip sits beside the reading controls. Identity comes from the
+        # image sha256 receipt, so it names one study, invents no patient and no date, and
+        # shows an alias of the same acquisition as text instead of a second viewer.
         strip = real.locator('.md-series')
+        strip_text = strip.inner_text()
         assert strip.is_visible()
-        assert 'DEMO-P-01' in strip.inner_text() and '시연 가정' in strip.inner_text()
-        assert '신원 미검증' in strip.inner_text()
+        assert '이 검사 1건' in strip_text and 'image sha256' in strip_text
+        assert 'LL-CT-001' in strip_text
+        assert 'DEMO-P-01' not in strip_text and '가정' not in strip_text
         assert real.locator('.md-series-current').inner_text().startswith('이 검사 · case_000')
-        strip.get_by_role('button', name=re.compile('^이전 CT · LL-CT-001')).click()
-        expect(real.locator('.md-series-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
+        assert real.locator('.md-series-chip').count() == 0
         assert real.locator('.md-series-viewer canvas').count() == 0
-        strip.get_by_role('button', name=re.compile('^다음 CT · case_001')).click()
-        expect(real.locator('.md-series-viewer')).to_have_attribute('data-load-state', 'ready')
-        assert real.locator('.md-series-viewer canvas').count() == 1
-        assert 'CT만 표시' in real.locator('.md-series-status').inner_text()
         # A case without any CT gets no series box, so no empty framed placeholder shows.
         assert page.evaluate("()=>[...document.querySelectorAll('.md-series')].every(n=>n.textContent.trim().length>0)")
         toggle = inline.get_by_role('button', name='재검토 후보', exact=True)
@@ -270,19 +267,17 @@ with sync_playwright() as p:
         page.locator('.md-record-protocol-button').click()
         assert page.locator('.md-record-protocol-body').is_hidden()
         assert page.locator('.md-record-protocol-button').get_attribute('aria-expanded') == 'false'
-        # The demo series travels with the record: the unviewable estimated study fails
-        # closed, while a study this server publishes opens as CT only.
+        # The record carries the same receipt-based strip: one study, the duplicate alias
+        # named once as text, and no second CT viewer mounted from an assumed pairing.
         series = page.locator('.md-record-series')
-        assert series.is_visible() and 'DEMO-P-01' in series.inner_text()
-        assert '시연 구성' in series.inner_text() and '신원 미검증' in series.inner_text()
+        series_text = series.inner_text()
+        assert series.is_visible()
+        assert 'image sha256' in series_text and 'LL-CT-001' in series_text
+        assert 'DEMO-P-01' not in series_text and '신원 미검증' not in series_text and '가정' not in series_text
         assert page.locator('.md-record-series-current').inner_text().startswith('이 검사 · case_000')
-        series.get_by_role('button', name=re.compile('^이전 CT · LL-CT-001')).click()
-        expect(page.locator('.md-record-series-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
+        assert '복제 표시' in page.locator('.md-record-series-dup').inner_text()
+        assert page.locator('.md-record-series-chip').count() == 0
         assert page.locator('.md-record-series-viewer canvas').count() == 0
-        series.get_by_role('button', name=re.compile('^다음 CT · case_001')).click()
-        expect(page.locator('.md-record-series-viewer')).to_have_attribute('data-load-state', 'ready')
-        assert page.locator('.md-record-series-viewer canvas').count() == 1
-        assert '현재 데이터 연결 표시' in page.locator('.md-record-series-status').inner_text()
         page.goto(f'{BASE}/')
         card.wait_for()
         page.locator('#mdFilter').select_option('pending')

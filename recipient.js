@@ -141,20 +141,21 @@
       protocol.append(el('h3','조직검사 진행 방법'),protocolButton,protocolBody);
       card.append(protocol);
     }
-    // Studies shown as one patient's series are a demo grouping (MD.seriesFor), so
-    // identity stays labelled unverified and every date stays labelled assumed.
+    // The study list travels with the record. Identity comes from the image sha256
+    // receipts, so no date here is assumed; a duplicate alias of the same acquisition is
+    // named once as text instead of being mounted as another exam.
     if(r.series&&Array.isArray(r.series.studies)&&r.series.studies.length){
       const series=el('section','','md-record-series');
-      series.append(el('h3','환자 시리즈(시연 가정) · '+(r.series.patientId||'시리즈 미확인')));
+      series.append(el('h3','검사 시리즈 · '+(r.series.patientId||'이 데이터셋은 환자당 CT 1건 · 환자 키 없음')));
       const seriesChips=el('div','','md-record-series-chips');
       const seriesStatus=el('p','','md-record-series-status');seriesStatus.setAttribute('role','status');
-      seriesStatus.textContent='시리즈 짝은 시연 구성입니다. 환자 이력·경과 판단에 쓰지 마세요.';
+      seriesStatus.textContent='검사 식별은 image sha256 receipt 기준입니다. 같은 환자의 다른 검사는 이 데이터셋에 없습니다. 환자 이력·경과 판단에 쓰지 마세요.';
       const seriesHost=el('div','','md-record-series-viewer');seriesHost.hidden=true;
       async function openSeriesStudy(study,chip){
         if(seriesView){seriesView.close();seriesView=null;}
         seriesHost.hidden=true;seriesHost.replaceChildren();
         if(study.relation==='current'){seriesStatus.textContent='이 검사는 위의 전달 CT 버튼으로 확인합니다 · 전송 시점 바인딩을 통과한 경우에만 표시됩니다.';return;}
-        if(!study.viewable){seriesStatus.textContent=study.alias+' 영상을 열 수 없습니다. 이 서버가 제공하는 자산 목록에 이 검사가 없습니다. 추정 근거와 표시 촬영일은 그대로 남습니다.';return;}
+        if(!study.viewable){seriesStatus.textContent=study.alias+' 영상을 열 수 없습니다. 이 서버가 제공하는 자산 목록에 이 검사가 없습니다. 표시 근거는 그대로 남습니다.';return;}
         chip.disabled=true;seriesStatus.textContent='현재 자료 목록에서 '+study.alias+' 확인 중…';
         try{
           const response=await fetch('/data/model_compare/manifest.json',{cache:'no-store'});
@@ -167,11 +168,11 @@
           seriesView=MDViewer.mount(seriesHost,{id:entry.id,slices:entry.slices.map(s=>({ct:s.ct}))},['ct'],null);
           seriesHost.querySelector('canvas')?.setAttribute('aria-label',entry.id+' '+study.label+' · 모델 오버레이 없음 · 방향키 절편 이동');
           if(Number.isInteger(entry.defaultSlice))seriesView.setSlice(entry.defaultSlice);
-          seriesStatus.textContent=entry.id+' · '+entry.slices.length+'절편 · CT만 표시 · 현재 데이터 연결 표시(전송 시점 스냅샷 아님) · 표시 촬영일 '+(study.assumedDate||'기록 없음')+'(가정)';
+          seriesStatus.textContent=entry.id+' · '+entry.slices.length+'절편 · CT만 표시 · 현재 데이터 연결 표시(전송 시점 스냅샷 아님)'+(study.assumedDate?' · 표시 촬영일 '+study.assumedDate+'(가정)':'');
         }catch(_){
           if(token!==generation)return;
           seriesView=null;seriesHost.hidden=true;seriesHost.replaceChildren();
-          seriesStatus.textContent=study.alias+' 영상을 열 수 없습니다. 현재 자료 목록에서 확인하지 못했습니다. 추정 근거와 표시 촬영일은 그대로 남습니다.';
+          seriesStatus.textContent=study.alias+' 영상을 열 수 없습니다. 현재 자료 목록에서 확인하지 못했습니다. 표시 근거는 그대로 남습니다.';
         }finally{if(token===generation)chip.disabled=false;}
       }
       for(const study of r.series.studies){
@@ -180,7 +181,8 @@
         chip.dataset.seriesRelation=study.relation;
         seriesChips.append(chip);
       }
-      series.append(seriesChips,seriesStatus,seriesHost,el('p',(r.series.basis||'')+' · 동일 환자 신원 미검증 · 촬영일은 시연 가정값','md-record-series-note'));
+      if(Array.isArray(r.series.duplicates)&&r.series.duplicates.length)seriesChips.append(el('p','같은 검사가 다시 표시되지 않습니다. 복제 표시: '+r.series.duplicates.map(d=>d.alias+' · '+d.reason).join(', '),'md-record-series-dup'));
+      series.append(seriesChips,seriesStatus,seriesHost,el('p',(r.series.basis||'')+(r.series.patientIdBasis?' · '+r.series.patientIdBasis:''),'md-record-series-note'));
       card.append(series);
     }
     // A same-source earlier study is an inferred pairing for the demo, not a verified
