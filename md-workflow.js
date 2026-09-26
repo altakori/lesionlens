@@ -31,8 +31,11 @@
   // assumption (MD.seriesFor), so identity stays labelled unverified and dates stay
   // labelled assumed. Studies this server does not publish fail closed with a reason.
   function seriesBlock(c){
-    const series=M.seriesFor(c),box=el('div',null,'md-series');
-    if(!series)return box;
+    const series=M.seriesFor(c);
+    // The synthetic workflow case has no CT at all, so it gets no box rather than an
+    // empty framed placeholder.
+    if(!series)return null;
+    const box=el('div',null,'md-series');
     box.append(el('p','환자 시리즈(시연 가정) · '+M.seriesSummary(c),'md-series-title'));
     const chips=el('div',null,'md-series-chips');
     const note=el('p','','md-series-status');note.setAttribute('role','status');
@@ -64,7 +67,7 @@
       if(e?.reasons.length)chips.append(el('span','모델 간 불일치','md-reason-chip md-tag'));
       if(e?.reasons.some(r=>r.smallAdditional))chips.append(el('span','작은 추가 후보','md-reason-chip md-tag'));
       const badge=el('span',state.reviews[c.id]?'검토 완료':'미검토','md-row-state');card.append(badge); // Reason text above already contains every tag.
-      card.append(seriesBlock(c));
+      const seriesBox=seriesBlock(c);if(seriesBox)card.append(seriesBox);
       const secondary=el('div',null,'md-card-measurements md-metrics');
       for(const k of M.models){const m=e?.models[k]||c.models[k];secondary.append(el('p',m?`${M.labels[k]} · 3D 후보 ${m.componentCount}개 · 최대 ${Number((m.maxVolumeMl??Math.max(0,...m.componentVolumesMl)).toFixed(4))} mL · 전체 ${Number((m.totalVolumeMl??m.volumeMl).toFixed(4))} mL`:`${M.labels[k]} · 자료 없음`));}
       // Quantitative values remain available in the existing details table.

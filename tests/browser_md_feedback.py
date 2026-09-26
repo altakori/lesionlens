@@ -184,6 +184,8 @@ with sync_playwright() as p:
         expect(real.locator('.md-series-viewer')).to_have_attribute('data-load-state', 'ready')
         assert real.locator('.md-series-viewer canvas').count() == 1
         assert 'CT만 표시' in real.locator('.md-series-status').inner_text()
+        # A case without any CT gets no series box, so no empty framed placeholder shows.
+        assert page.evaluate("()=>[...document.querySelectorAll('.md-series')].every(n=>n.textContent.trim().length>0)")
         toggle = inline.get_by_role('button', name='재검토 후보', exact=True)
         real.get_by_role('button', name='주치의에게 전송하기').click()
         dialog.get_by_label('LOCAL DEMO로 연구 CT를 로컬 전달하기 (실제 환자/주치의 연결·병원 전송 아님)', exact=True).check()
