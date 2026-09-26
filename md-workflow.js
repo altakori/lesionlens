@@ -26,7 +26,22 @@
     for(const k of M.models){const s=e?.models[k] || c.models[k], row=el('tr');
       const values=s?[M.labels[k],s.componentCount,s.maxVolumeMl??Math.max(0,...s.componentVolumesMl),s.totalVolumeMl??s.volumeMl]:[M.labels[k],'자료 없음','—','—'];
       values.forEach(v=>row.append(el('td',typeof v==='number'?String(Number(v.toFixed(4))):v)));table.append(row);}
-    d.append(table,el('p','생성형 AI 소견 없음 · 진단/악성/전이/응급도는 판단하지 않습니다.'),el('p','별도 Radiomics 자료는 아래 보조 영역에서 확인합니다. 데이터셋 자동 매칭 없음.'));return d;}
+    d.append(table,el('p','생성형 AI 소견 없음 · 진단/악성/전이/응급도는 판단하지 않습니다.'),el('p','별도 Radiomics 자료는 아래 보조 영역에서 확인합니다. 데이터셋 자동 매칭 없음.'));
+    // The study identity is read most often while reading the AI 신호, so it opens here
+    // too. It is a summary of the same receipt, not a second copy of the viewer.
+    const sd=seriesSummaryDetails(c);if(sd)d.append(sd);
+    return d;}
+  // One plain line for the AI 소견 expansion: a second nested fold inside an already
+  // folded area is harder to find than the sentence, and it never mounts a viewer.
+  function seriesSummaryDetails(c){
+    const series=M.seriesFor(c);if(!series)return null;
+    const others=series.studies.filter(k=>k.relation!=='current').length;
+    const dup=series.duplicates.length
+      ? '같은 검사의 다른 별칭(복제)만 확인됩니다: '+series.duplicates.map(x=>x.alias+' · '+x.reason).join(', ')
+      : '이 검사 외에 확인할 이전·다음 검사가 이 자료에 없습니다.';
+    return el('p','검사 시리즈 · '+series.studies.length+'건 · 이전·다음 '+(others?others+'건':'없음')+' · '+dup+' '
+      +series.basis+(series.patientIdBasis?' · '+series.patientIdBasis:'')+' · 경과 판단에 쓰지 마세요','md-details-series');
+  }
   // Study list next to the reading controls. Identity comes from the image sha256
   // receipts (MD.studyReceipts), not from a guessed patient, so there are no assumed
   // dates here. A duplicate alias of the same acquisition is named once as text and
@@ -36,8 +51,14 @@
     // The synthetic workflow case has no CT at all, so it gets no box rather than an
     // empty framed placeholder.
     if(!series)return null;
-    const box=el('div',null,'md-series-wrap'),bar=el('div',null,'md-series');
-    const title=el('p','검사 시리즈 · '+M.seriesSummary(c),'md-series-title');
+    const box=el('div',null,'md-series-wrap');
+    const others=series.studies.filter(k=>k.relation!=='current').length;
+    const toggle=el('button');toggle.type='button';toggle.className='md-series-toggle';
+    toggle.setAttribute('aria-expanded','false');
+    toggle.append(el('span','검사 시리즈 · '+series.studies.length+'건 · 이전·다음 '+(others?others+'건':'없음'),'md-series-toggle-label'),el('span','▾','md-series-caret'));
+    const body=el('div',null,'md-series-body');body.hidden=true;
+    const bar=el('div',null,'md-series');
+    const title=el('p',M.seriesSummary(c),'md-series-title');
     const chips=el('div',null,'md-series-chips');
     const note=el('p','','md-series-status');note.setAttribute('role','status');
     const host=el('div',null,'md-series-viewer');host.hidden=true;
@@ -67,7 +88,10 @@
     bar.append(title,chips,note,el('p',series.basis+(series.patientIdBasis?' · '+series.patientIdBasis:'')+' · 경과 판단에 쓰지 마세요','md-series-note'));
     // The study viewer is a sibling of the status bar, so opening a study never
     // stretches the bar itself.
-    box.append(bar,host);
+    toggle.onclick=()=>{const openNow=body.hidden;body.hidden=!openNow;toggle.setAttribute('aria-expanded',String(openNow));caret.textContent=openNow?'▴':'▾';};
+    const caret=toggle.querySelector('.md-series-caret');
+    body.append(bar);
+    box.append(toggle,body,host);
     return box;
   }
   function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();const items=M.queue(cases,evidence,state,filter.value,search.value);
@@ -77,12 +101,14 @@
       if(e?.reasons.length)chips.append(el('span','모델 간 불일치','md-reason-chip md-tag'));
       if(e?.reasons.some(r=>r.smallAdditional))chips.append(el('span','작은 추가 후보','md-reason-chip md-tag'));
       const badge=el('span',state.reviews[c.id]?'검토 완료':'미검토','md-row-state');card.append(badge); // Reason text above already contains every tag.
-      const seriesBox=seriesBlock(c);if(seriesBox)card.append(seriesBox);
       const secondary=el('div',null,'md-card-measurements md-metrics');
       for(const k of M.models){const m=e?.models[k]||c.models[k];secondary.append(el('p',m?`${M.labels[k]} · 3D 후보 ${m.componentCount}개 · 최대 ${Number((m.maxVolumeMl??Math.max(0,...m.componentVolumesMl)).toFixed(4))} mL · 전체 ${Number((m.totalVolumeMl??m.volumeMl).toFixed(4))} mL`:`${M.labels[k]} · 자료 없음`));}
       // Quantitative values remain available in the existing details table.
       const d=details(c,e);card.append(d);const viewer=el('div',null,'md-inline-viewer');viewer.hidden=true;let view;
-      const open=action('CT 확대',()=>{if(viewer.hidden){d.open=false;viewer.hidden=false;view=MViewer();open.textContent='CT 접기';}else{view.close();viewer.hidden=true;open.textContent='CT 확대';}});
+      // The study series belongs to the reading view, so it opens with the CT and never
+      // adds a third always-visible band to the collapsed card.
+      const seriesBox=seriesBlock(c);if(seriesBox)seriesBox.hidden=true;
+      const open=action('CT 확대',()=>{if(viewer.hidden){d.open=false;viewer.hidden=false;if(seriesBox)seriesBox.hidden=false;view=MViewer();open.textContent='CT 접기';}else{view.close();viewer.hidden=true;if(seriesBox)seriesBox.hidden=true;open.textContent='CT 확대';}});
       function MViewer(){const v=g.MDViewer.mount(viewer,c);views.push(v);return v;}
       const review=action(state.reviews[c.id]?'다시 검토':'확인함',()=>{try{records.review(c.id,!state.reviews[c.id]);refresh();}catch(_){say('검토 저장 실패 · 상태 불변');}});
       review.setAttribute('aria-pressed',String(!!state.reviews[c.id]));
@@ -92,7 +118,7 @@
       for(const sent of Object.values(state.sends).filter(r=>r.case.id===c.id)){
         const link=el('a','보낸 기록 상세 · '+sent.time,'md-sent-record-link');link.href=M.recordLink(scope,sent.id);card.append(link);
       }
-      card.append(viewer,decisions);list.append(card);
+      card.append(viewer,seriesBox,decisions);list.append(card);
     }
     if(!items.length)list.append(el('p','조건에 맞는 사례 없음 · 전체 필터에서 다시 검토할 수 있습니다.'));
   }

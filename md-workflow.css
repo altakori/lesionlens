@@ -159,9 +159,17 @@ body[data-md-workflow="true"] .topbar{padding:12px max(24px,calc((100vw - 1160px
 #mdList .md-inline-viewer[hidden]{display:none}
 #mdList .md-case-card:has(.md-inline-viewer:not([hidden])) .md-decision-actions{grid-column:1/-1;grid-row:auto;padding-top:12px;border-top:1px solid #e3e5ee}
 #mdList .md-case-card>.md-sent-record-link{grid-column:1/-1;font-size:12px}
-/* Series is a one-line status bar, not a column: it spans the card so the 165px
-   identity column never stretches the row into dead space. */
-#mdList .md-series-wrap{grid-column:1/-1;grid-row:3;margin:2px 0 0}
+/* Series is opened by the reader, so it flows under the CT viewer instead of
+   occupying an always-visible band on every card. */
+#mdList .md-series-wrap{grid-column:1/-1;grid-row:auto;margin:8px 0 0}
+#mdList .md-series-wrap[hidden]{display:none}
+#mdList .md-series-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 10px;font-size:12px;font-weight:600;color:#4b4365;text-align:left;background:#faf9fe;border:1px solid #e8e6f2;border-radius:8px}
+#mdList .md-series-toggle:hover{background:#f4f1fb}
+#mdList .md-series-toggle-label{flex:1 1 auto;overflow-wrap:anywhere}
+#mdList .md-series-caret{flex:0 0 auto;color:#8b82a8}
+#mdList .md-series-body{padding:6px 10px 0}
+#mdList .md-series-body[hidden]{display:none}
+#mdList .md-series{border:0;background:none;padding:0}
 #mdList .md-series{padding:5px 10px;border:1px solid #e8e6f2;border-radius:8px;background:#faf9fe;font-size:12px;line-height:1.5}
 #mdList .md-series-title{display:inline-block;font-size:12px;font-weight:600;color:#4b4365;margin:0 10px 0 0}
 #mdList .md-series-chips{display:inline-flex;flex-wrap:wrap;gap:6px;margin:0;vertical-align:middle}
@@ -181,7 +189,8 @@ body[data-md-workflow="true"] .topbar{padding:12px max(24px,calc((100vw - 1160px
 #mdList .md-series-viewer .md-image-panel{margin:0}
 @media(max-width:480px){#mdList .md-series-viewer{width:100%}}
 #mdList .md-series-viewer[hidden]{display:none}
-#mdList .md-case-card:has(.md-details[open]) .md-series-wrap{grid-row:4}
+/* AI 소견 expansion repeats the same study identity as one sentence. */
+.md-details-series{margin:10px 0 0;font-size:12px;line-height:1.6;color:#5f6472;overflow-wrap:anywhere}
 .md-secondary{margin-top:12px}
 @media(max-width:800px){
 body[data-md-workflow="true"] .topbar{padding:12px 18px}.md-send-navigation{padding:8px 18px}

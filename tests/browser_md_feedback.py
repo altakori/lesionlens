@@ -126,6 +126,9 @@ with sync_playwright() as p:
     page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
     real = page.locator('[data-case-id="case_000"]')
     if real.count():
+        # The series view is not an always-on band: it opens with the CT and stays folded
+        # until the reader asks for it.
+        assert real.locator('.md-series-wrap').is_hidden()
         real.get_by_role('button',name='CT 확대',exact=True).click()
         viewer=real.locator('.md-inline-viewer')
         assert viewer.locator('canvas').count()==4
@@ -169,18 +172,31 @@ with sync_playwright() as p:
         real.get_by_role('button', name='CT 확대', exact=True).click()
         inline = real.locator('.md-inline-viewer')
         assert inline.locator('canvas').count() == 4
-        # A per-case study strip sits beside the reading controls. Identity comes from the
-        # image sha256 receipt, so it names one study, invents no patient and no date, and
-        # shows an alias of the same acquisition as text instead of a second viewer.
+        # The study strip is folded inside the CT view: it opens with a toggle, names one
+        # study from the image sha256 receipt, and shows a duplicate alias as text instead
+        # of mounting a second viewer.
         strip = real.locator('.md-series')
+        assert not strip.is_visible()
+        series_toggle = real.locator('.md-series-toggle')
+        assert '이전·다음 없음' in series_toggle.inner_text()
+        series_toggle.click()
+        assert strip.is_visible() and series_toggle.get_attribute('aria-expanded') == 'true'
         strip_text = strip.inner_text()
-        assert strip.is_visible()
         assert '이 검사 1건' in strip_text and 'image sha256' in strip_text
         assert 'LL-CT-001' in strip_text
         assert 'DEMO-P-01' not in strip_text and '가정' not in strip_text
         assert real.locator('.md-series-current').inner_text().startswith('이 검사 · case_000')
         assert real.locator('.md-series-chip').count() == 0
         assert real.locator('.md-series-viewer canvas').count() == 0
+        # The AI 소견 expansion repeats the same identity as one sentence and mounts no
+        # second copy of the study.
+        ai_series = real.locator('.md-details-series')
+        assert not ai_series.is_visible()
+        real.locator('.md-details > summary').click()
+        assert ai_series.is_visible() and 'LL-CT-001' in ai_series.inner_text()
+        assert ai_series.locator('.md-series-viewer').count() == 0
+        # Opening AI 소견 must not add a second always-visible series band.
+        assert real.locator('.md-series-wrap').count() == 1
         # A case without any CT gets no series box, so no empty framed placeholder shows.
         assert page.evaluate("()=>[...document.querySelectorAll('.md-series')].every(n=>n.textContent.trim().length>0)")
         toggle = inline.get_by_role('button', name='재검토 후보', exact=True)
