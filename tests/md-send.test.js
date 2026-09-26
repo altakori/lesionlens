@@ -227,12 +227,19 @@ test('review candidates collapse model-pair rows into one row per candidate and 
 test('a biopsy target is validated against this case\'s candidates and stored immutably',async()=>{
  const {c,context,scope}=await setup(),storage=memory(),s=M.store(storage,scope);
  const e=evidenceOf(pair('cp050:3','cappyv2','cp050',174),pair('cp050:3','cappyv2','lesionfinder',174));
- const d={...draft('biopsy-send'),followup:'immediate_us_biopsy',biopsy:'cp050:3'};
+ const d={...draft('biopsy-send'),followup:'immediate_us_biopsy',biopsyProtocol:'ct',biopsy:'cp050:3'};
  const r=s.send(c,d,e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(r.biopsyProtocol,'ct');assert.equal(M.biopsyProtocolLabel(r.biopsyProtocol),'CT 유도');
  assert.deepEqual(r.biopsyCandidate,{candidateId:'cp050:3',model:'cappyv2',voxel:[10,20,174],slice:174,small:false});
  assert.equal(M.biopsyCandidateLabel(r.biopsyCandidate),'cp050:3 · 절편 175');
  d.biopsy='cp999';d.followup='other';
  assert.equal(JSON.stringify(M.store(storage,scope).read().sends[r.id]),JSON.stringify(r));
+ // A biopsy opinion is not actionable without the route that performs it, and a
+ // protocol attached to a non-biopsy opinion is rejected rather than silently dropped.
+ assert.throws(()=>s.send(c,{...draft('biopsy-no-protocol'),followup:'immediate_us_biopsy',biopsy:'cp050:3'},e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Biopsy opinion requires a guidance protocol/);
+ assert.throws(()=>s.send(c,{...draft('biopsy-bad-protocol'),followup:'immediate_us_biopsy',biopsyProtocol:'xray',biopsy:'cp050:3'},e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Biopsy opinion requires a guidance protocol/);
+ assert.throws(()=>s.send(c,{...draft('protocol-without-biopsy'),followup:'short_term_followup',biopsyProtocol:'us'},e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid biopsy protocol/);
+ assert.equal(s.read().sends['biopsy-no-protocol'],undefined);assert.equal(s.read().sends['protocol-without-biopsy'],undefined);
  assert.throws(()=>s.send(c,{...draft('biopsy-unknown'),biopsy:'cp999'},e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid biopsy candidate/);
  assert.throws(()=>s.send(c,{...draft('biopsy-no-evidence'),biopsy:'cp050:3'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid biopsy candidate/);
  assert.equal(s.read().sends['biopsy-unknown'],undefined);assert.equal(s.read().sends['biopsy-no-evidence'],undefined);
@@ -243,6 +250,55 @@ test('a biopsy target is validated against this case\'s candidates and stored im
  assert.equal(M.normalizeDraft(M.demo,{...draft(),biopsy:'cp050:3'}).biopsy,'cp050:3');
  assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{...draft(),visitRequest:false}),'visitRequest'),false);
  assert.equal(M.normalizeDraft(M.demo,{...draft(),visitRequest:true}).visitRequest,true);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{...draft(),biopsyProtocol:''}),'biopsyProtocol'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{...draft(),biopsyProtocol:'pet'}),'biopsyProtocol'),false);
+ assert.equal(M.normalizeDraft(M.demo,{...draft(),biopsyProtocol:'mri'}).biopsyProtocol,'mri');
+});
+
+test('biopsy protocol checklist is demo wording that routes to institutional confirmation',()=>{
+ assert.deepEqual(M.biopsyProtocolOptions,['us','ct','mri','surgical']);
+ assert.equal(M.biopsyProtocolLabel('us'),'초음파(US) 유도');
+ assert.equal(M.biopsyProtocolLabel(undefined),'이 전송에는 조직검사 프로토콜이 기록되지 않았습니다.');
+ assert.equal(M.biopsyProtocolLabel('robotic'),'읽을 수 없는 프로토콜');
+ for(const key of M.biopsyProtocolOptions){
+  const g=M.protocolGuide(key);
+  assert.equal(g.kind,'demo-protocol-guide-v1');assert.equal(g.key,key);
+  assert.ok(g.title&&g.fit&&g.steps.length>=4&&g.confirm);
+  assert.match(g.authority,/이 병원의 실제 프로토콜 문서 아님/);
+  const text=JSON.stringify(g);
+  // No fabricated clinical numbers, and the wording never claims an institution's rule.
+  assert.equal(/\d+\s?(?:Gy|mGy|mmHg|mL|h|시간|일|%)/.test(text),false,text.slice(0,80));
+  assert.match(g.confirm,/기관 확인 필요|해당 기관에서 확인 필요/);
+ }
+ assert.equal(M.protocolGuide('xray'),null);
+ assert.equal(M.protocolGuide(undefined),null);
+ // The guidance list must never be handed to the MD as a pre-filled default.
+ assert.equal(M.normalizeDraft(M.demo,draft()).biopsyProtocol,undefined);
+});
+
+test('patient series is a geometry-based demo grouping with assumed dates, never verified identity',async()=>{
+ const {c,cases,context,scope}=await setup(),s=M.store(memory(),scope);
+ const s0=M.seriesFor(c);
+ assert.equal(s0.patientId,'DEMO-P-01');
+ assert.deepEqual(s0.studies.map(k=>k.relation),['prior','current','next']);
+ assert.deepEqual(s0.studies.map(k=>k.alias),['LL-CT-001','case_000','case_001']);
+ assert.deepEqual(s0.studies.map(k=>k.viewable),[false,true,true]);
+ assert.deepEqual(s0.studies.map(k=>k.dateIsAssumed),[true,true,true]);
+ assert.match(s0.basis,/같은 획득 프로토콜로 추정/);
+ assert.equal(M.seriesSummary(c),'DEMO-P-01 · 이전 1건 · 이 검사 · 다음 1건');
+ // The pairing must not move when the same case is read again.
+ assert.deepEqual(M.seriesFor({id:c.id}),s0);
+ const last=cases.find(x=>x.id==='case_001');
+ assert.deepEqual(M.seriesFor(last).studies.map(k=>k.relation),['prior','prior','current']);
+ const pair2=cases.find(x=>x.id==='case_045');
+ assert.deepEqual(M.seriesFor(pair2).studies.map(k=>k.label),['이 검사','다음 CT']);
+ assert.deepEqual(M.seriesFor(cases.find(x=>x.id==='case_048')).studies.map(k=>k.relation),['current']);
+ assert.equal(M.seriesFor(M.demo),null);
+ const record=s.send(c,draft('series-send'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.deepEqual(record.series,s0);
+ // The synthetic workflow case has no CT, so no series is attached to its record.
+ const synthetic=M.store(memory(),'demo-only-v1').send(M.demo,{...draft('series-synthetic'),selected:[],none:true},null,'DEMO');
+ assert.equal(synthetic.dataKind,'synthetic-no-ct');assert.equal(synthetic.series,null);
 });
 
 test('outpatient request is accepted only for a not-visited demo case and stored as a request, not a send',async()=>{

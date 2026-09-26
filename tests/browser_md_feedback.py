@@ -169,6 +169,21 @@ with sync_playwright() as p:
         real.get_by_role('button', name='CT 확대', exact=True).click()
         inline = real.locator('.md-inline-viewer')
         assert inline.locator('canvas').count() == 4
+        # A per-patient study series strip sits beside the reading controls. The
+        # grouping is a demo assumption, and a study this server does not publish has
+        # to fail closed instead of substituting another case's CT.
+        strip = real.locator('.md-series')
+        assert strip.is_visible()
+        assert 'DEMO-P-01' in strip.inner_text() and '시연 가정' in strip.inner_text()
+        assert '신원 미검증' in strip.inner_text()
+        assert real.locator('.md-series-current').inner_text().startswith('이 검사 · case_000')
+        strip.get_by_role('button', name=re.compile('^이전 CT · LL-CT-001')).click()
+        expect(real.locator('.md-series-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
+        assert real.locator('.md-series-viewer canvas').count() == 0
+        strip.get_by_role('button', name=re.compile('^다음 CT · case_001')).click()
+        expect(real.locator('.md-series-viewer')).to_have_attribute('data-load-state', 'ready')
+        assert real.locator('.md-series-viewer canvas').count() == 1
+        assert 'CT만 표시' in real.locator('.md-series-status').inner_text()
         toggle = inline.get_by_role('button', name='재검토 후보', exact=True)
         real.get_by_role('button', name='주치의에게 전송하기').click()
         dialog.get_by_label('LOCAL DEMO로 연구 CT를 로컬 전달하기 (실제 환자/주치의 연결·병원 전송 아님)', exact=True).check()
@@ -186,25 +201,37 @@ with sync_playwright() as p:
         assert inline.get_by_role('button', name='재검토 후보', exact=True).get_attribute('aria-pressed') == 'true'
         rows.first.click()
         assert rows.first.get_attribute('aria-pressed') == 'false'
-        # A biopsy opinion has to name its target, so the picker only appears with it.
+        # A biopsy opinion has to name its target and the route that performs it, so
+        # both pickers appear with that opinion and neither one is pre-filled.
         assert dialog.locator('.md-biopsy').is_hidden()
-        dialog.get_by_label('즉시 US 유도 조직검사', exact=True).check()
+        dialog.get_by_label('즉시 조직검사 · 프로토콜 선택', exact=True).check()
         assert dialog.locator('.md-biopsy').is_visible()
-        assert dialog.locator('.md-biopsy select option').count() == rows.count() + 1
-        dialog.locator('.md-biopsy select').select_option(index=1)
-        assert dialog.locator('.md-biopsy select').input_value() != ''
+        assert dialog.locator('.md-biopsy select').count() == 2
+        assert dialog.locator('.md-biopsy select').nth(0).input_value() == ''
+        assert dialog.locator('.md-biopsy select').nth(1).locator('option').count() == rows.count() + 1
+        dialog.locator('.md-biopsy select').nth(1).select_option(index=1)
+        assert dialog.locator('.md-biopsy select').nth(1).input_value() != ''
+        # US is not a default: the checklist only exists once the MD names a protocol.
+        assert dialog.locator('.md-biopsy-guide').is_hidden()
+        dialog.locator('.md-biopsy select').nth(0).select_option(label='CT 유도')
+        assert dialog.locator('.md-biopsy-guide').is_visible()
+        assert 'CT 유도 조직검사' in dialog.locator('.md-biopsy-guide').inner_text()
+        assert '이 병원의 실제 프로토콜 문서 아님' in dialog.locator('.md-biopsy-guide').inner_text()
         # Free text stays behind '기타'; anything already typed is never hidden again.
         assert dialog.locator('.md-notes-wrap').is_hidden()
         dialog.get_by_label('기타(직접 입력)', exact=True).check()
         assert dialog.locator('.md-notes-wrap').is_visible()
         dialog.locator('textarea').fill('SYNTHETIC review shortcut memo')
-        dialog.get_by_label('즉시 US 유도 조직검사', exact=True).check()
+        dialog.get_by_label('즉시 조직검사 · 프로토콜 선택', exact=True).check()
         assert dialog.locator('.md-notes-wrap').is_visible()
         assert dialog.locator('textarea').input_value() == 'SYNTHETIC review shortcut memo'
-        # Leaving the biopsy opinion clears its target, so the MD must pick it again.
-        assert dialog.locator('.md-biopsy select').input_value() == ''
-        dialog.locator('.md-biopsy select').select_option(index=1)
-        assert dialog.locator('.md-biopsy select').input_value() != ''
+        # Leaving the biopsy opinion clears target and protocol, so both are re-picked.
+        assert dialog.locator('.md-biopsy select').nth(1).input_value() == ''
+        assert dialog.locator('.md-biopsy select').nth(0).input_value() == ''
+        assert dialog.locator('.md-biopsy-guide').is_hidden()
+        dialog.locator('.md-biopsy select').nth(0).select_option(label='CT 유도')
+        dialog.locator('.md-biopsy select').nth(1).select_option(index=1)
+        assert dialog.locator('.md-biopsy-guide').is_visible()
         assert dialog.locator('fieldset.md-visit').is_visible()
         assert '시연용 가정값' in dialog.locator('fieldset.md-visit legend').inner_text()
         dialog.get_by_role('button', name='LOCAL DEMO 보내기', exact=True).click()
@@ -223,19 +250,37 @@ with sync_playwright() as p:
         assert page.locator('.md-received-viewer .md-candidate-toggle[aria-pressed="true"]').count() == 1
         biopsy_button.click()
         assert biopsy_button.get_attribute('aria-pressed') == 'false'
-        # The inferred earlier study is labelled as an estimate and opens CT-only.
-        prior = page.locator('.md-prior-study')
-        assert 'LL-CT-001' in prior.inner_text() and '2026-05-14' in prior.inner_text()
-        assert '추정 짝' in prior.inner_text() and '검증된 이전 검사 아님' in prior.inner_text()
-        prior_button = page.get_by_role('button', name='이전 CT(추정) 보기', exact=True)
-        prior_button.click()
-        # The integrated server only serves data/model_compare assets, so an estimated
-        # real_cases study has to fail closed with a stated reason rather than quietly
-        # substituting another patient's CT.
-        expect(page.locator('.md-prior-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
-        assert page.locator('.md-prior-viewer canvas').count() == 0
-        assert prior_button.get_attribute('aria-expanded') == 'false'
-        assert 'LL-CT-001' in prior.inner_text()
+        # The receiver sees which route the MD chose and can open its checklist.
+        assert 'CT 유도' in page.locator('.md-record-biopsy-protocol').inner_text()
+        protocol_button = page.get_by_role('button', name='조직검사 프로토콜 보기', exact=True)
+        assert protocol_button.get_attribute('aria-expanded') == 'false'
+        assert page.locator('.md-record-protocol-body').is_hidden()
+        protocol_button.click()
+        protocol_body = page.locator('.md-record-protocol-body')
+        assert protocol_body.is_visible()
+        # The control renames itself while open, so later steps hold it by class.
+        assert page.locator('.md-record-protocol-button').get_attribute('aria-expanded') == 'true'
+        assert page.get_by_role('button', name='조직검사 프로토콜 접기', exact=True).count() == 1
+        assert 'CT 유도 조직검사' in protocol_body.inner_text()
+        assert protocol_body.locator('li').count() >= 4
+        assert '기관 확인 필요' in protocol_body.inner_text()
+        assert '이 병원의 실제 프로토콜 문서 아님' in protocol_body.inner_text()
+        page.locator('.md-record-protocol-button').click()
+        assert page.locator('.md-record-protocol-body').is_hidden()
+        assert page.locator('.md-record-protocol-button').get_attribute('aria-expanded') == 'false'
+        # The demo series travels with the record: the unviewable estimated study fails
+        # closed, while a study this server publishes opens as CT only.
+        series = page.locator('.md-record-series')
+        assert series.is_visible() and 'DEMO-P-01' in series.inner_text()
+        assert '시연 구성' in series.inner_text() and '신원 미검증' in series.inner_text()
+        assert page.locator('.md-record-series-current').inner_text().startswith('이 검사 · case_000')
+        series.get_by_role('button', name=re.compile('^이전 CT · LL-CT-001')).click()
+        expect(page.locator('.md-record-series-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
+        assert page.locator('.md-record-series-viewer canvas').count() == 0
+        series.get_by_role('button', name=re.compile('^다음 CT · case_001')).click()
+        expect(page.locator('.md-record-series-viewer')).to_have_attribute('data-load-state', 'ready')
+        assert page.locator('.md-record-series-viewer canvas').count() == 1
+        assert '현재 데이터 연결 표시' in page.locator('.md-record-series-status').inner_text()
         page.goto(f'{BASE}/')
         card.wait_for()
         page.locator('#mdFilter').select_option('pending')

@@ -27,6 +27,36 @@
       const values=s?[M.labels[k],s.componentCount,s.maxVolumeMl??Math.max(0,...s.componentVolumesMl),s.totalVolumeMl??s.volumeMl]:[M.labels[k],'자료 없음','—','—'];
       values.forEach(v=>row.append(el('td',typeof v==='number'?String(Number(v.toFixed(4))):v)));table.append(row);}
     d.append(table,el('p','생성형 AI 소견 없음 · 진단/악성/전이/응급도는 판단하지 않습니다.'),el('p','별도 Radiomics 자료는 아래 보조 영역에서 확인합니다. 데이터셋 자동 매칭 없음.'));return d;}
+  // Patient series next to the reading controls. The grouping itself is a demo
+  // assumption (MD.seriesFor), so identity stays labelled unverified and dates stay
+  // labelled assumed. Studies this server does not publish fail closed with a reason.
+  function seriesBlock(c){
+    const series=M.seriesFor(c),box=el('div',null,'md-series');
+    if(!series)return box;
+    box.append(el('p','환자 시리즈(시연 가정) · '+M.seriesSummary(c),'md-series-title'));
+    const chips=el('div',null,'md-series-chips');
+    const note=el('p','','md-series-status');note.setAttribute('role','status');
+    const host=el('div',null,'md-series-viewer');host.hidden=true;
+    let shown=null;
+    function closeStudy(){if(shown){shown.close();shown=null;}host.hidden=true;host.replaceChildren();}
+    for(const study of series.studies){
+      if(study.relation==='current'){chips.append(el('span',study.label+' · '+study.alias,'md-series-current'));continue;}
+      const chip=el('button',study.label+' · '+study.alias+(study.assumedDate?' · '+study.assumedDate+'(가정)':''));
+      chip.type='button';chip.className='md-series-chip';chip.dataset.seriesRelation=study.relation;
+      chip.onclick=()=>{
+        const other=cases.find(x=>x.id===study.alias);
+        closeStudy();
+        if(!study.viewable||!other){note.textContent=study.alias+' 영상을 이 화면에서 열 수 없습니다. 이 서버가 제공하는 자산 목록에 이 검사가 없습니다. 시리즈 근거와 표시 촬영일은 그대로 남습니다.';return;}
+        shown=g.MDViewer.mount(host,other,['ct']);views.push(shown);host.hidden=false;
+        host.querySelector('canvas')?.setAttribute('aria-label',study.alias+' '+study.label+' · CT만 표시 · 모델 오버레이 없음 · 방향키 절편 이동');
+        if(Number.isInteger(other.defaultSlice))shown.setSlice(other.defaultSlice);
+        note.textContent=study.alias+' · '+other.slices.length+'절편 · CT만 표시 · 동일 환자 신원 미검증 · 표시 촬영일 '+study.assumedDate+'(가정)';
+      };
+      chips.append(chip);
+    }
+    box.append(chips,note,host,el('p',series.basis+' · 동일 환자 신원 미검증 · 촬영일은 시연 가정값 · 경과 판단에 쓰지 마세요','md-series-note'));
+    return box;
+  }
   function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();const items=M.queue(cases,evidence,state,filter.value,search.value);
     for(const c of items){const e=evidence[c.id], card=el('article',null,'md-case-card');card.dataset.caseId=c.id;
       card.append(el('h2',c.id),el('strong',c.synthetic?'DEMO ONLY · 합성 워크플로 시연 · 실제 CT/환자 없음':M.reason(e),'md-core-reason'));
@@ -34,6 +64,7 @@
       if(e?.reasons.length)chips.append(el('span','모델 간 불일치','md-reason-chip md-tag'));
       if(e?.reasons.some(r=>r.smallAdditional))chips.append(el('span','작은 추가 후보','md-reason-chip md-tag'));
       const badge=el('span',state.reviews[c.id]?'검토 완료':'미검토','md-row-state');card.append(badge); // Reason text above already contains every tag.
+      card.append(seriesBlock(c));
       const secondary=el('div',null,'md-card-measurements md-metrics');
       for(const k of M.models){const m=e?.models[k]||c.models[k];secondary.append(el('p',m?`${M.labels[k]} · 3D 후보 ${m.componentCount}개 · 최대 ${Number((m.maxVolumeMl??Math.max(0,...m.componentVolumesMl)).toFixed(4))} mL · 전체 ${Number((m.totalVolumeMl??m.volumeMl).toFixed(4))} mL`:`${M.labels[k]} · 자료 없음`));}
       // Quantitative values remain available in the existing details table.
@@ -170,10 +201,31 @@
     const noLabel=el('label','모델 참고 없음'),none=el('input');none.type='checkbox';none.checked=draft.none;none.onchange=()=>{draft.none=none.checked;if(draft.none)draft.selected=[];persist();};noLabel.prepend(none);group.append(noLabel);dialog.append(group);
     const followup=el('fieldset',null,'md-followup');followup.append(el('legend','후속조치 의견  ·  MD 작성 · AI 자동 선택 아님'));
     const followupHint=el('p','메모에 원하는 후속조치를 직접 적어주세요.','md-followup-hint');followupHint.hidden=draft.followup!=='other';
-    const followupRadios={};for(const key of M.followupOptions){const l=el('label',M.followupLabels[key]),r=el('input');r.type='radio';r.name='md-followup';r.value=key;r.checked=draft.followup===key;r.onchange=()=>{if(!r.checked)return;draft.followup=key;if(key!=='immediate_us_biopsy'){delete draft.biopsy;biopsySelect.value='';}followupHint.hidden=key!=='other';syncFollowupVisibility();persist();};followupRadios[key]=r;l.prepend(r);followup.append(l);}
+    const followupRadios={};for(const key of M.followupOptions){const l=el('label',M.followupLabels[key]),r=el('input');r.type='radio';r.name='md-followup';r.value=key;r.checked=draft.followup===key;r.onchange=()=>{if(!r.checked)return;draft.followup=key;if(key!=='immediate_us_biopsy'){delete draft.biopsy;biopsySelect.value='';delete draft.biopsyProtocol;protocolSelect.value='';}followupHint.hidden=key!=='other';syncFollowupVisibility();persist();};followupRadios[key]=r;l.prepend(r);followup.append(l);}
     followup.append(followupHint);
     // Biopsy needs a target, not a free-text hint: pick the candidate from a list.
     const biopsyWrap=el('div',null,'md-biopsy');
+    // Which guidance route performs the biopsy decides who does it, where, and what
+    // preparation is needed, so the MD picks it explicitly. Nothing defaults to US.
+    const protocolGuideBox=el('div',null,'md-biopsy-guide');protocolGuideBox.hidden=true;
+    function renderProtocolGuide(key){protocolGuideBox.replaceChildren();const guide=M.protocolGuide(key);if(!guide)return;
+      protocolGuideBox.append(el('p',guide.title,'md-biopsy-guide-title'),
+        el('p','적합 예시 · '+guide.fit,'md-biopsy-guide-line'),
+        el('p','사전 확인 · '+guide.steps.join(' · '),'md-biopsy-guide-line'),
+        el('p','기관 확인 필요 · '+guide.confirm,'md-biopsy-guide-confirm'),
+        el('p',guide.authority,'md-biopsy-guide-note'));}
+    const protocolLabel=el('label','조직검사 프로토콜 (AI 자동 선택 아님)');
+    const protocolSelect=el('select');
+    const protocolNone=el('option','프로토콜 선택 안 함');protocolNone.value='';protocolSelect.append(protocolNone);
+    for(const key of M.biopsyProtocolOptions){const o=el('option',M.biopsyProtocolLabels[key]);o.value=key;protocolSelect.append(o);}
+    protocolSelect.value=draft.biopsyProtocol||'';
+    if(!draft.biopsyProtocol)delete draft.biopsyProtocol;
+    if(draft.followup==='immediate_us_biopsy'&&draft.biopsyProtocol)renderProtocolGuide(draft.biopsyProtocol);
+    protocolSelect.onchange=()=>{
+      if(protocolSelect.value)draft.biopsyProtocol=protocolSelect.value;else delete draft.biopsyProtocol;
+      renderProtocolGuide(protocolSelect.value);syncFollowupVisibility();persist();};
+    protocolLabel.append(protocolSelect);
+    const protocolHint=el('p','프로토콜을 고르지 않으면 전송할 수 없습니다. US가 기본값이 아닙니다.','md-biopsy-note');
     const biopsyLabel=el('label','조직검사할 후보 (AI 자동 선택 아님)');
     const biopsySelect=el('select');
     const biopsyNone=el('option','후보 선택 안 함');biopsyNone.value='';biopsySelect.append(biopsyNone);
@@ -183,7 +235,7 @@
     biopsySelect.onchange=()=>{if(biopsySelect.value)draft.biopsy=biopsySelect.value;else delete draft.biopsy;persist();};
     biopsyLabel.append(biopsySelect);
     const biopsyNote=el('p',candidates.length?'AI가 후보를 고르지 않습니다. 아래 목록에서 직접 선택하세요. 선택은 표시 전용이며 판정·측정이 아닙니다.':'이 사례에는 표시할 재검토 후보가 없어 조직검사 후보를 고를 수 없습니다.','md-biopsy-note');
-    biopsyWrap.append(biopsyLabel,biopsyNote);followup.append(biopsyWrap);
+    biopsyWrap.append(protocolLabel,protocolHint,protocolGuideBox,biopsyLabel,biopsyNote);followup.append(biopsyWrap);
     dialog.append(followup);
     const notesLabel=el('label','MD 추가 소견·임상 메모 (로컬 초안 · 실제 전송 불가)'),notes=el('textarea');notes.value=draft.notes;notes.oninput=()=>{draft.notes=notes.value;persist();};notesLabel.append(notes);
     const notesWrap=el('div',null,'md-notes-wrap');notesWrap.append(notesLabel);dialog.append(notesWrap,error);
@@ -193,6 +245,7 @@
       const biopsy=draft.followup==='immediate_us_biopsy';
       biopsyWrap.hidden=!biopsy;
       biopsyNote.hidden=!biopsy;
+      protocolGuideBox.hidden=!(biopsy&&draft.biopsyProtocol);
       notesWrap.hidden=!(draft.followup==='other'||draft.notes.trim());
     }
     syncFollowupVisibility();

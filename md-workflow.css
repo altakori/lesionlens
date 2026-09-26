@@ -244,3 +244,42 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 .md-prior-status { font-size:12px; color:#626879; margin:10px 0; }
 .md-prior-button { border:1px solid #cbc6dc; background:#f6f3fc; color:#514268; border-radius:6px; padding:10px 16px; min-height:40px; }
 .md-prior-viewer { margin-top:14px; }
+
+/* Reading screen: simulated patient series and its CT-only study viewer. */
+.md-series { margin:10px 0; padding:10px 12px; border:1px solid var(--md-line); border-radius:10px; background:#fbfaff; }
+.md-series-title { font-size:13px; font-weight:600; margin:0; }
+.md-series-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.md-series-chip { border:1px solid #cbc6dc; background:#f6f3fc; color:#514268; border-radius:6px; padding:8px 12px; min-height:40px; font-size:13px; }
+.md-series-chip:disabled { opacity:1; color:#8b8fa0; background:#f1f2f6; border-color:#e0e2ea; }
+.md-series-current { border:1px dashed #9c8ec4; background:#fff; color:#3f3357; border-radius:6px; padding:8px 12px; font-size:13px; font-weight:600; }
+.md-series-status { font-size:12px; color:#626879; margin:8px 0 0; overflow-wrap:anywhere; }
+.md-series-viewer { margin-top:10px; }
+.md-series-note { font-size:12px; color:var(--md-muted); line-height:1.6; margin:8px 0 0; }
+/* Send dialog: the biopsy guidance protocol and its checklist. */
+#mdSendDialog .md-biopsy-guide { margin:10px 0 0; padding:10px 12px; border:1px dashed #cbc6dc; border-radius:8px; background:#fff; }
+#mdSendDialog .md-biopsy-guide-title { font-size:13px; font-weight:600; margin:0; }
+#mdSendDialog .md-biopsy-guide-line { font-size:12px; color:#4f5566; line-height:1.7; margin:6px 0 0; }
+#mdSendDialog .md-biopsy-guide-confirm { font-size:12px; color:#8a5a12; line-height:1.7; margin:6px 0 0; }
+#mdSendDialog .md-biopsy-guide-note { font-size:11px; color:var(--md-muted); margin:6px 0 0; }
+/* Receiver side: protocol checklist and the series strip. */
+.md-record-protocol { margin:22px 0; padding:16px; border:1px dashed #cbc6dc; border-radius:10px; background:#fbfaff; }
+.md-record-protocol h3 { font-size:15px; margin-bottom:8px; }
+.md-record-protocol-button { border:1px solid #cbc6dc; background:#f6f3fc; color:#514268; border-radius:6px; padding:10px 16px; min-height:40px; }
+.md-record-protocol-body { margin-top:12px; }
+.md-record-protocol-title { font-size:14px; font-weight:600; margin:0; }
+.md-record-protocol-line { font-size:13px; color:#4f5566; line-height:1.7; margin:8px 0 0; }
+.md-record-protocol-body ul { margin:8px 0 0; padding-left:20px; }
+.md-record-protocol-body li { font-size:13px; line-height:1.7; }
+.md-record-protocol-confirm { font-size:13px; color:#8a5a12; line-height:1.7; margin:10px 0 0; }
+.md-record-protocol-note { font-size:12px; color:var(--md-muted); line-height:1.7; margin:10px 0 0; }
+.md-record-biopsy-protocol { font-size:13px; margin:6px 0 0; }
+.md-record-series { margin:22px 0; padding:16px; border:1px dashed #cbc6dc; border-radius:10px; background:#fbfaff; }
+.md-record-series h3 { font-size:15px; margin-bottom:8px; }
+.md-record-series-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.md-record-series-chip { border:1px solid #cbc6dc; background:#f6f3fc; color:#514268; border-radius:6px; padding:10px 16px; min-height:40px; }
+.md-record-series-chip:disabled { opacity:1; color:#8b8fa0; background:#f1f2f6; border-color:#e0e2ea; }
+.md-record-series-current { font-size:13px; font-weight:600; margin:0; padding:10px 0; }
+.md-record-series-status { font-size:12px; color:#626879; margin:10px 0; }
+.md-record-series-viewer { margin-top:12px; }
+.md-record-series-note { font-size:12px; color:#656b7b; line-height:1.7; margin:8px 0 0; }
+@media(max-width:480px) { .md-series { padding:10px; } .md-series-chip,.md-series-current { width:100%; } }

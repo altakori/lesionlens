@@ -6,11 +6,45 @@
   // Structured follow-up opinion written by the reviewing MD. Nothing is pre-selected:
   // an absent key means no opinion was given, and no code path infers one.
   const followupOptions = ['short_term_followup','immediate_us_biopsy','other','none'];
-  const followupLabels = {short_term_followup:'단기 추적검사', immediate_us_biopsy:'즉시 US 유도 조직검사', other:'기타(직접 입력)', none:'의견 없음'};
+  // The opinion states "biopsy now", not "biopsy under ultrasound": which guidance
+  // protocol is used is a separate required field so a CT-, MRI- or OR-based plan is
+  // expressible. The option key keeps its historical name so records saved before
+  // this change still read; only the reviewer-facing wording changed.
+  const followupLabels = {short_term_followup:'단기 추적검사', immediate_us_biopsy:'즉시 조직검사 · 프로토콜 선택', other:'기타(직접 입력)', none:'의견 없음'};
   function followupLabel(value) {
     if (value === undefined) return '이 전송에는 의견 기록이 없습니다.';
     if (typeof value !== 'string' || !Object.hasOwn(followupLabels, value)) return '읽을 수 없는 의견 유형';
     return followupLabels[value];
+  }
+  const biopsyProtocolOptions = ['us','ct','mri','surgical'];
+  const biopsyProtocolLabels = {us:'초음파(US) 유도', ct:'CT 유도', mri:'MRI 유도', surgical:'수술실 생검'};
+  function biopsyProtocolLabel(value) {
+    if (value === undefined) return '이 전송에는 조직검사 프로토콜이 기록되지 않았습니다.';
+    if (typeof value !== 'string' || !Object.hasOwn(biopsyProtocolLabels, value)) return '읽을 수 없는 프로토콜';
+    return biopsyProtocolLabels[value];
+  }
+  // Pre-procedure checklist for the demo only: general practice wording, not this
+  // hospital's protocol. It deliberately carries no dose, drug or timing figures and
+  // every card ends with the items that must be confirmed with the institution.
+  const biopsyProtocolGuides = {
+    us:{title:'초음파(US) 유도 조직검사', fit:'간·경부·표재성 병변처럼 초음파로 보이는 부위',
+      steps:['병변 접근 경로와 실시간 관찰 가능 여부를 영상에서 확인','항혈전제·항응고제 복용력과 응고 상태는 담당 주치의가 확인','환자 설명·동의 절차와 시술 부위 체위 안내','초음파 프로브·생검총 준비 및 무균 절차','시술 후 압박·출혈 관찰과 병리 의뢰 경로 공유'],
+      confirm:'초음파실 운영 시간, 장비 배정, 시술 가능 인력은 기관 확인 필요'},
+    ct:{title:'CT 유도 조직검사', fit:'폐·복막후·골 병변처럼 초음파로 보이지 않는 부위',
+      steps:['저선량 위치 확인 스캔 후 바늘 경로 계획','호흡 정지 지시가 필요한 부위는 사전에 환자 교육','피폭 선량은 기관 프로토콜 기준으로 계산','시술 직후 영상에서 기흉·출혈 여부 확인','검체 운반 경로와 결과 회송 일정 공유'],
+      confirm:'CT실 사용 가능 시간대, 물리사 배정, 회복 관찰 병상은 기관 확인 필요'},
+    mri:{title:'MRI 유도 조직검사', fit:'조영 증강 양상이 중요한 유방·전립선·골반 병변',
+      steps:['MRI 호환 장비와 비자성 세트 확인','조영제 투여 가능 여부와 신기능은 담당 주치의가 확인','폐소공·메탈 클립 등 MRI 금기 여부 사전 점검','장시간 검사 대비 체위·소음 안내','검체 식별자와 영상 시점 연결 확인'],
+      confirm:'MRI 유도 시술 가능 여부·장비·적응증은 해당 기관에서 확인 필요'},
+    surgical:{title:'수술실 생검·절제 생검', fit:'영상 유도 생검이 어렵거나 치료적 절제를 함께 계획하는 경우',
+      steps:['외과·마취과 사전 상담 및 마취 평가','금식 시간과 입원 일정은 기관 지침에 따름','병변 위치 표시(태깅) 필요 여부를 영상의학과와 협의','수술 후 병리 결과 회송 경로 확정','항혈전제 중단 여부는 담당 주치의 판단'],
+      confirm:'수술실 배정, 마취과 평가 일정, 병상 상황은 기관 확인 필요'}
+  };
+  function protocolGuide(value) {
+    if (typeof value !== 'string' || !Object.hasOwn(biopsyProtocolGuides, value)) return null;
+    const one = biopsyProtocolGuides[value];
+    return {kind:'demo-protocol-guide-v1', key:value, label:biopsyProtocolLabels[value], title:one.title,
+      fit:one.fit, steps:one.steps.slice(), confirm:one.confirm, authority:'시연용 일반 안내 · 이 병원의 실제 프로토콜 문서 아님'};
   }
   // Pre-opinion the reviewing MD may record next to the AI disagreement signals.
   // Nothing is pre-selected and no code path infers a value. The review list already
@@ -46,6 +80,7 @@
       ...(Object.hasOwn(followupLabels, saved.followup) ? {followup:saved.followup} : {}),
       ...(Object.hasOwn(precheckLabels, saved.precheck) ? {precheck:saved.precheck} : {}),
       ...(typeof saved.biopsy === 'string' && saved.biopsy ? {biopsy:saved.biopsy} : {}),
+      ...(Object.hasOwn(biopsyProtocolLabels, saved.biopsyProtocol) ? {biopsyProtocol:saved.biopsyProtocol} : {}),
       ...(saved.visitRequest === true ? {visitRequest:true} : {}),
       ...normalizeReferences(c, saved.selected, saved.none),
       ...(['auto','basic'].includes(saved.viewpointChoice) ? {viewpointChoice:saved.viewpointChoice} : {}),
@@ -144,6 +179,13 @@
           if (!hit) throw Error('Invalid biopsy candidate');
           biopsyCandidate = {candidateId:hit.candidateId, model:hit.model, voxel:hit.voxel.slice(), slice:hit.slice, small:hit.small};
         }
+        // A biopsy opinion with no guidance protocol is not actionable for the
+        // receiver, so it fails closed instead of quietly defaulting to ultrasound.
+        let biopsyProtocol;
+        if (draft.followup === 'immediate_us_biopsy') {
+          if (typeof draft.biopsyProtocol !== 'string' || !biopsyProtocolOptions.includes(draft.biopsyProtocol)) throw Error('Biopsy opinion requires a guidance protocol');
+          biopsyProtocol = draft.biopsyProtocol;
+        } else if (draft.biopsyProtocol !== undefined) throw Error('Invalid biopsy protocol');
         const visit = visitStatus(c);
         if (draft.visitRequest !== undefined && draft.visitRequest !== true) throw Error('Invalid outpatient request');
         if (draft.visitRequest === true && visit !== 'scheduled_not_visited') throw Error('Outpatient request requires a not-visited case');
@@ -156,8 +198,9 @@
           ...(draft.followup !== undefined ? {followup:draft.followup} : {}),
           ...(draft.precheck !== undefined ? {precheck:draft.precheck} : {}),
           ...(biopsyCandidate ? {biopsyCandidate} : {}),
+          ...(biopsyProtocol ? {biopsyProtocol} : {}),
           visit:{status:visit, requested:draft.visitRequest === true},
-          priorStudy:research ? priorStudyFor(c) : null,
+          priorStudy:research ? priorStudyFor(c) : null, series:research ? seriesFor(c) : null,
           viewpoint, notes:draft.notes, evidence:clone(evidence || null), summary:'생성형 AI 소견 없음',
           sender:research?'LOCAL DEMO MD':'DEMO MD', time:new Date().toISOString(),
           recipient:research?{role:'LOCAL DEMO 임상 담당자',demo:true,patientMapping:null}:clone(c.mapping),
@@ -229,6 +272,50 @@
     return {kind:'demo-prior-study-v1', caseId:c.id, alias:entry.alias, manifestPath:entry.manifestPath,
       basis:entry.basis, assumedDate:entry.assumedDate, dateIsAssumed:true};
   }
+  // Simulated patient series for the reading screen. The demo manifest carries no
+  // patient identity, so studies are grouped by acquisition geometry (voxel spacing)
+  // and given assumed dates: a same-spacing pair is plausible as one patient's
+  // earlier and later exam, but the grouping is demo scaffolding, not verified
+  // identity, and no date here is real. It is a stable function of the case id, so a
+  // reload cannot reshuffle which exam counts as "previous" mid-review.
+  const seriesManifestPath = 'data/model_compare/manifest.json';
+  const seriesRelations = {prior:'이전 CT', current:'이 검사', next:'다음 CT'};
+  const seriesGroups = [
+    {patientId:'DEMO-P-01', basis:'voxel spacing 0.70×0.70×5.0 / 0.68×0.68×5.0 · 같은 획득 프로토콜로 추정',
+      studies:[
+        {alias:'LL-CT-001', manifestPath:'data/real_cases/manifest.json', assumedDate:'2026-04-30',
+          basis:'같은 원본 볼륨(sourceCaseId 000)에서 절편 50–73만 잘라 만든 시연용 짝 · 환자 검사가 아님'},
+        {alias:'case_000', manifestPath:seriesManifestPath, assumedDate:'2026-05-14'},
+        {alias:'case_001', manifestPath:seriesManifestPath, assumedDate:'2026-09-02'}]},
+    {patientId:'DEMO-P-02', basis:'voxel spacing 1.0×1.0×1.0 · 같은 획득 프로토콜로 추정',
+      studies:[{alias:'case_045', manifestPath:seriesManifestPath, assumedDate:'2026-06-20'},
+        {alias:'case_035', manifestPath:seriesManifestPath, assumedDate:'2026-09-10'}]},
+    {patientId:'DEMO-P-03', basis:'voxel spacing 0.98×0.98×2.5 · 이 검사만 확인',
+      studies:[{alias:'case_048', manifestPath:seriesManifestPath, assumedDate:'2026-09-18'}]}
+  ];
+  function seriesFor(c) {
+    if (!c || c.synthetic || typeof c.id !== 'string' || !c.id) return null;
+    const group = seriesGroups.find(one => one.studies.some(s => s.alias === c.id));
+    if (!group) return {kind:'demo-series-v1', patientId:null,
+      basis:'시연 자료에서 같은 프로토콜의 다른 검사를 찾지 못했습니다.', currentIndex:0,
+      studies:[{alias:c.id, manifestPath:seriesManifestPath, assumedDate:null, dateIsAssumed:false,
+        relation:'current', label:seriesRelations.current, viewable:true}]};
+    const currentIndex = group.studies.findIndex(s => s.alias === c.id);
+    const studies = group.studies.map((s,i) => ({alias:s.alias, manifestPath:s.manifestPath,
+      assumedDate:s.assumedDate, dateIsAssumed:true,
+      relation:i === currentIndex ? 'current' : i < currentIndex ? 'prior' : 'next',
+      label:i === currentIndex ? seriesRelations.current : i < currentIndex ? seriesRelations.prior : seriesRelations.next,
+      // Only a study published under this server's own asset root can be opened here.
+      viewable:s.manifestPath === seriesManifestPath, ...(s.basis ? {basis:s.basis} : {})}));
+    return {kind:'demo-series-v1', patientId:group.patientId, basis:group.basis, currentIndex, studies};
+  }
+  function seriesSummary(c) {
+    const s = seriesFor(c);
+    if (!s) return '';
+    const prior = s.studies.filter(k => k.relation === 'prior').length;
+    const next = s.studies.filter(k => k.relation === 'next').length;
+    return `${s.patientId || '시리즈 미확인'} · 이전 ${prior}건 · 이 검사 · 다음 ${next}건`;
+  }
   function biopsyCandidateLabel(v) {
     if (v === undefined) return '이 전송에는 조직검사 후보가 기록되지 않았습니다.';
     if (!v || typeof v.candidateId !== 'string' || !v.candidateId) return '읽을 수 없는 조직검사 후보';
@@ -252,6 +339,7 @@
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
   }
   const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,reviewCandidates,candidateLabel,biopsyCandidateLabel,
-    visitOptions,visitLabels,visitLabel,visitStatus,priorStudies,priorStudyFor,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
+    visitOptions,visitLabels,visitLabel,visitStatus,priorStudies,priorStudyFor,
+    biopsyProtocolOptions,biopsyProtocolLabels,biopsyProtocolLabel,protocolGuide,seriesFor,seriesSummary,seriesRelations,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);
