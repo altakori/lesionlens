@@ -157,6 +157,42 @@ test('MD follow-up opinion is stored once in the immutable snapshot and re-read 
  assert.equal(M.followupLabel('ct_is_normal'),'읽을 수 없는 의견 유형');
 });
 
+test('pre-opinion is never preselected; unknown or empty saved values stay absent',()=>{
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,draft()),'precheck'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{}),'precheck'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{precheck:''}),'precheck'),false);
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{precheck:'selected_by_ai'}),'precheck'),false);
+ assert.equal(M.normalizeDraft(M.demo,{precheck:'recheck_needed'}).precheck,'recheck_needed');
+ assert.equal(M.normalizeDraft(M.demo,{precheck:'deferred'}).precheck,'deferred');
+ assert.deepEqual(M.precheckOptions,['recheck_needed','not_needed','deferred']);
+});
+
+test('MD pre-opinion is stored once in the immutable snapshot and re-read unchanged',async()=>{
+ const {c,context,scope}=await setup(),storage=memory(),s=M.store(storage,scope);
+ const d={...draft('precheck-send'),precheck:'recheck_needed'};
+ const r=s.send(c,d,null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(r.precheck,'recheck_needed');assert.equal(M.precheckLabel(r.precheck),'재확인 필요');
+ assert.equal(Object.hasOwn(r,'followup'),false);
+ d.precheck='not_needed';
+ const reloaded=M.store(storage,scope).read().sends[r.id];
+ assert.equal(reloaded.precheck,'recheck_needed');
+ assert.equal(JSON.stringify(reloaded),JSON.stringify(r));
+ const r2=s.send(c,{...draft('precheck-deferred'),precheck:'deferred'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(M.precheckLabel(r2.precheck),'판단 유보');
+ // Omitting the field stays unrecorded; nothing infers a value for legacy sends.
+ const r3=s.send(c,draft('precheck-absent'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.equal(Object.hasOwn(r3,'precheck'),false);
+ assert.equal(M.precheckLabel(r3.precheck),'이 전송에는 사전 의견이 기록되지 않았습니다.');
+ assert.equal(M.precheckLabel('ct_is_normal'),'읽을 수 없는 사전 의견');
+});
+
+test('an unrecognised pre-opinion value is refused and leaves no send record',async()=>{
+ const {c,context,scope}=await setup(),s=M.store(memory(),scope);
+ assert.throws(()=>s.send(c,{...draft('bad-precheck'),precheck:'ct_is_normal'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid pre-opinion record/);
+ assert.equal(s.read().sends['bad-precheck'],undefined);
+ assert.equal(Object.keys(s.read().sends).length,0);
+});
+
 test('an unrecognised follow-up value is refused and leaves no send record',async()=>{
  const {c,context,scope}=await setup(),s=M.store(memory(),scope);
  assert.throws(()=>s.send(c,{...draft('bad-followup'),followup:'ct_is_normal'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid followup opinion/);

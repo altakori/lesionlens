@@ -12,6 +12,16 @@
     if (typeof value !== 'string' || !Object.hasOwn(followupLabels, value)) return '읽을 수 없는 의견 유형';
     return followupLabels[value];
   }
+  // Pre-opinion the reviewing MD may record next to the AI disagreement signals.
+  // Nothing is pre-selected and no code path infers a value. The review list already
+  // shows model disagreement, so this is a reference record, not an independent pre-read.
+  const precheckOptions = ['recheck_needed','not_needed','deferred'];
+  const precheckLabels = {recheck_needed:'재확인 필요', not_needed:'재확인 불필요', deferred:'판단 유보'};
+  function precheckLabel(value) {
+    if (value === undefined) return '이 전송에는 사전 의견이 기록되지 않았습니다.';
+    if (typeof value !== 'string' || !Object.hasOwn(precheckLabels, value)) return '읽을 수 없는 사전 의견';
+    return precheckLabels[value];
+  }
   const demo = {id:'DEMO-WORKFLOW-001', synthetic:true, slices:[], models:{},
     mapping:{patientId:'DEMO-PATIENT', recipientId:'DEMO-CLINICIAN', department:'DEMO clinical team', approved:true, demo:true}};
   const clone = x => JSON.parse(JSON.stringify(x));
@@ -34,6 +44,7 @@
     return {id: typeof saved.id === 'string' && saved.id.trim() ? saved.id : makeId(),
       notes: typeof saved.notes === 'string' ? saved.notes : '',
       ...(Object.hasOwn(followupLabels, saved.followup) ? {followup:saved.followup} : {}),
+      ...(Object.hasOwn(precheckLabels, saved.precheck) ? {precheck:saved.precheck} : {}),
       ...normalizeReferences(c, saved.selected, saved.none),
       ...(['auto','basic'].includes(saved.viewpointChoice) ? {viewpointChoice:saved.viewpointChoice} : {}),
       ...(saved.viewpoint != null ? {viewpoint:clone(saved.viewpoint)} : {})};
@@ -121,6 +132,7 @@
         if (!selection(c, draft.selected, draft.none) || typeof draft.id !== 'string' || !draft.id.trim() || typeof draft.notes !== 'string') throw Error('Invalid selection');
         const viewpoint = validateViewpoint(draft.viewpoint, c, research ? envelope.binding : null);
         if (draft.followup !== undefined && (typeof draft.followup !== 'string' || !followupOptions.includes(draft.followup))) throw Error('Invalid followup opinion');
+        if (draft.precheck !== undefined && (typeof draft.precheck !== 'string' || !precheckOptions.includes(draft.precheck))) throw Error('Invalid pre-opinion record');
         const existing = read().sends[draft.id];
         if (existing) {
           if (existing.case.id !== c.id || existing.mode !== mode) throw Error('Idempotency conflict');
@@ -128,6 +140,7 @@
         }
         const record = {id:draft.id, mode, scope, dataKind:research?'research-ct':'synthetic-no-ct', case:clone(c), selected:clone(draft.selected), none:draft.none,
           ...(draft.followup !== undefined ? {followup:draft.followup} : {}),
+          ...(draft.precheck !== undefined ? {precheck:draft.precheck} : {}),
           viewpoint, notes:draft.notes, evidence:clone(evidence || null), summary:'생성형 AI 소견 없음',
           sender:research?'LOCAL DEMO MD':'DEMO MD', time:new Date().toISOString(),
           recipient:research?{role:'LOCAL DEMO 임상 담당자',demo:true,patientMapping:null}:clone(c.mapping),
@@ -157,6 +170,6 @@
     const hash = await g.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
   }
-  const api = {followupOptions,followupLabels,followupLabel,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
+  const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);

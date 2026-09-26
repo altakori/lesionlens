@@ -77,6 +77,11 @@
       optLabel.prepend(opt);const demoRole=el('p','실제 임상 전송 차단 · 로컬 DEMO를 선택하면 이 브라우저에만 저장됩니다.','md-demo-roles');
       dialog.append(optLabel,demoRole);
     }
+    const precheck=el('fieldset',null,'md-precheck');precheck.append(el('legend','사전 의견  ·  선택 입력 · 미작성 시 미기록'));
+    precheck.append(el('p','이 창은 재검토 목록의 모델 불일치 신호를 이미 표시합니다. 따라서 이 항목은 AI를 보기 전의 독립적 판단이 아니라, 전송 시점에 남기는 MD의 참고 기록입니다.','md-precheck-caveat'));
+    const precheckRadios={};for(const key of M.precheckOptions){const l=el('label',M.precheckLabels[key]),r=el('input');r.type='radio';r.name='md-precheck';r.value=key;r.checked=draft.precheck===key;r.onchange=()=>{if(!r.checked)return;draft.precheck=key;precheckClear.disabled=false;persist();};precheckRadios[key]=r;l.prepend(r);precheck.append(l);}
+    const precheckClear=action('미작성으로 되돌리기',()=>{delete draft.precheck;for(const key of M.precheckOptions){precheckRadios[key].checked=false;}precheckClear.disabled=true;persist();});
+    precheckClear.disabled=draft.precheck===undefined;precheckClear.className='md-precheck-clear';precheck.append(precheckClear);dialog.append(precheck);
     if(e?.reasons.length){const candidates=el('ul',null,'md-send-candidates');for(const r of e.reasons)candidates.append(el('li',`${r.candidateId} · ${M.labels[r.model]} ↔ ${M.labels[r.otherModel]} · voxel ${r.voxel.join(', ')} · 절편 ${r.slice+1}`));dialog.append(candidates);}
     const viewpointGroup=el('fieldset',null,'md-viewpoint-options');viewpointGroup.append(el('legend','전달 화면 위치'));
     const basicLabel=el('label','기본 보기 (화면 위치 첨부 안 함)'),basic=el('input');basic.type='radio';basic.name='md-viewpoint';basic.value='basic';

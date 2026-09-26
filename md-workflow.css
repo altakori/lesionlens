@@ -54,6 +54,10 @@
 #mdSendDialog label { display:flex; align-items:center; gap:8px; font-size:14px; min-height:44px; }
 #mdSendDialog input[type=checkbox], #mdSendDialog input[type=radio] { accent-color:var(--md-accent); width:18px; height:18px; min-height:18px; }
 #mdSendDialog .md-followup-hint { color:var(--md-muted); font-size:13px; margin:6px 0 0; }
+#mdSendDialog .md-precheck-caveat { color:var(--md-muted); font-size:13px; margin:0 0 8px; }
+#mdSendDialog .md-precheck-clear { font-size:13px; min-height:36px; margin:4px 0 0; }
+#mdSendDialog .md-precheck-clear[disabled] { opacity:.55; }
+.md-record-precheck { font-weight:600; }
 .md-record-followup { font-weight:600; }
 #mdSendDialog label:has(textarea) { display:block; }
 #mdSendDialog textarea { display:block; resize:vertical; width:100%; min-height:130px; padding:12px; border:1px solid #cdd0de; border-radius:9px; font:inherit; margin:8px 0 14px; box-sizing:border-box; }

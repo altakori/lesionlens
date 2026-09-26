@@ -53,7 +53,8 @@
       el('p',r.none?'모델 참고 없음':'참고 모델: '+(Array.isArray(r.selected)?r.selected.map(k=>MD.labels[k]||'알 수 없는 모델').join(', '):'선택 기록 오류')));
     if(r.binding)reference.append(el('p',`전송 시점 데이터: ${r.binding.manifestVersion} · ${r.binding.sourceCaseId} · ${r.case.sliceCount} 절편`));
     reference.append(el('p',r.viewpoint?'보낸 화면 위치 첨부 · 현재 원본 연결 확인 후 복원 · PNG/WebP 대비는 표시 전용 (HU 아님)':'기본 보기 · 첨부된 화면 위치 없음','md-record-viewpoint'));
-    const memo=el('section','','md-record-memo');memo.append(el('h3','MD 후속조치 의견·추가 소견'),
+    const memo=el('section','','md-record-memo');memo.append(el('h3','MD 사전 의견·후속조치·추가 소견'),
+      el('p','사전 의견(참고) · '+MD.precheckLabel(r.precheck),'md-record-precheck'),
       el('p','의견 유형 · '+MD.followupLabel(r.followup),'md-record-followup'),
       el('p',typeof r.notes==='string'?(r.notes.trim()||'추가 메모가 없습니다.'):'메모 기록을 읽을 수 없습니다.'));
     const why=el('section','','md-record-why');why.append(el('h3','재검토 이유'),el('strong',reason(r.evidence)),el('p','모델 비교 결과입니다. 진단이나 응급도를 뜻하지 않습니다.'));

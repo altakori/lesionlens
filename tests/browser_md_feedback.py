@@ -2,10 +2,13 @@
 import os
 from playwright.sync_api import expect, sync_playwright
 
+# Comparison runs launch the same suite against a second port.
+BASE = os.environ.get('LESIONLENS_BASE_URL', 'http://127.0.0.1:4173')
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, **({'executable_path':os.environ['CHROME_EXECUTABLE']} if os.environ.get('CHROME_EXECUTABLE') else {}))
     page = browser.new_page()
-    page.goto('http://127.0.0.1:4173/')
+    page.goto(f'{BASE}/')
     page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
     page.evaluate('localStorage.clear()')
     page.reload()
@@ -42,11 +45,22 @@ with sync_playwright() as p:
     # The MD opinion must start untouched: no radio preselects, no AI guess.
     assert dialog.locator('fieldset.md-followup input[type=radio]:checked').count() == 0
     assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_hidden()
+    # The pre-opinion group also starts blank, and its caveat states the limit.
+    assert dialog.locator('fieldset.md-precheck input[type=radio]:checked').count() == 0
+    assert dialog.locator('.md-precheck-clear').is_disabled()
+    assert dialog.get_by_text('이 창은 재검토 목록의 모델 불일치 신호를 이미 표시합니다').is_visible()
     dialog.get_by_label('기타(직접 입력)', exact=True).check()
     assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_visible()
     dialog.get_by_label('단기 추적검사', exact=True).check()
     assert not dialog.get_by_label('기타(직접 입력)', exact=True).is_checked()
     assert dialog.get_by_text('메모에 원하는 후속조치를 직접 적어주세요.').is_hidden()
+    dialog.get_by_label('재확인 필요', exact=True).check()
+    assert not dialog.locator('.md-precheck-clear').is_disabled()
+    dialog.get_by_role('button', name='미작성으로 되돌리기').click()
+    assert dialog.locator('fieldset.md-precheck input[type=radio]:checked').count() == 0
+    assert dialog.locator('.md-precheck-clear').is_disabled()
+    dialog.get_by_label('판단 유보', exact=True).check()
+    dialog.get_by_label('재확인 필요', exact=True).check()
     assert dialog.locator('.md-viewpoint-options [value=attached]').is_disabled()
     dialog.locator('textarea').fill('SYNTHETIC browser note')
     page.keyboard.press('Escape')
@@ -75,7 +89,7 @@ with sync_playwright() as p:
       return JSON.parse(localStorage.getItem(key)).drafts['DEMO-WORKFLOW-001'];
     }''')
     # Automatic intent survives normalization; this synthetic case has no viewpoint.
-    assert restored == {'id':draft_id,'notes':'SYNTHETIC browser note','selected':[],'none':True,'viewpointChoice':'auto','followup':'short_term_followup'}
+    assert restored == {'id':draft_id,'notes':'SYNTHETIC browser note','selected':[],'none':True,'viewpointChoice':'auto','followup':'short_term_followup','precheck':'recheck_needed'}
     page.keyboard.press('Escape')
     dialog.get_by_role('button', name='계속 작성').click()
     # Throw before persistence: failed send must leave draft and case pending.
@@ -91,15 +105,16 @@ with sync_playwright() as p:
     page.reload()
     page.locator('#mdFilter').select_option('sent')
     page.locator('[data-case-id="DEMO-WORKFLOW-001"]').wait_for()
-    page.goto('http://127.0.0.1:4173/recipient.html')
+    page.goto(f'{BASE}/recipient.html')
     page.get_by_role('link', name='상세 보기', exact=True).first.click()
     page.locator('.md-record-memo').get_by_text('SYNTHETIC browser note', exact=True).wait_for()
-    # Opinion type is the first thing the receiving clinician reads.
-    assert page.locator('.md-record-memo p').first.inner_text() == '의견 유형 · 단기 추적검사'
+    # Pre-opinion and opinion type are the first things the receiving clinician reads.
+    assert page.locator('.md-record-precheck').inner_text() == '사전 의견(참고) · 재확인 필요'
+    assert page.locator('.md-record-followup').inner_text() == '의견 유형 · 단기 추적검사'
     page.get_by_role('button', name='수신 확인 (진료 판단 아님)').click()
     page.reload()
     assert page.get_by_role('button', name='수신 확인됨', exact=False).is_disabled()
-    page.goto('http://127.0.0.1:4173/')
+    page.goto(f'{BASE}/')
     page.locator('#mdFilter').select_option('sent')
     page.get_by_role('button', name='다시 검토', exact=True).click()
     page.locator('#mdFilter').select_option('pending')
