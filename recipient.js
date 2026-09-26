@@ -1,13 +1,13 @@
 (function(){
   'use strict';
   const root=document.getElementById('recipientList'),status=document.getElementById('receiptStatus'),title=document.getElementById('recipientTitle');
-  let generation=0,view=null;
+  let generation=0,view=null,priorView=null;
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
   const link=(text,href,cls)=>{const n=el('a',text,cls);n.href=href;return n;};
   const button=(text,fn,cls)=>{const n=el('button',text,cls);n.type='button';n.onclick=fn;return n;};
   const reason=e=>{try{return MD.reason(e);}catch(_){return '전송 시점 비교 근거를 읽을 수 없습니다.';}};
   function render(){
-    const token=++generation;if(view)view.close();view=null;root.replaceChildren();status.textContent='';
+    const token=++generation;if(view)view.close();view=null;if(priorView){priorView.close();priorView=null;}root.replaceChildren();status.textContent='';
     const query=new URLSearchParams(location.hash.slice(1)),mode=query.get('mode')==='sent'?'sent':'inbox';
     const id=query.get('record'),scope=query.get('scope');
     title.textContent=mode==='sent'?'보낸 사례 · LOCAL DEMO':'수신함 · LOCAL DEMO';
@@ -57,6 +57,9 @@
       el('p','사전 의견(참고) · '+MD.precheckLabel(r.precheck),'md-record-precheck'),
       el('p','의견 유형 · '+MD.followupLabel(r.followup),'md-record-followup'),
       el('p',typeof r.notes==='string'?(r.notes.trim()||'추가 메모가 없습니다.'):'메모 기록을 읽을 수 없습니다.'));
+    const biopsyLine=el('p','조직검사 후보 · '+MD.biopsyCandidateLabel(r.biopsyCandidate),'md-record-biopsy');
+    const visitLine=el('p','내원 정보(시연 가정) · '+MD.visitLabel(r.visit?.status)+(r.visit?.requested===true?' · 주치의 외래 요청 요청됨(발송 아님)':''),'md-record-visit');
+    memo.append(biopsyLine,visitLine);
     const why=el('section','','md-record-why');why.append(el('h3','재검토 이유'),el('strong',reason(r.evidence)),el('p','모델 비교 결과입니다. 진단이나 응급도를 뜻하지 않습니다.'));
     const essentials=el('div','','md-received-essentials');essentials.append(memo,why);
     card.append(link('목록으로',`recipient.html#mode=${mode}`,'md-record-back'),summary,essentials);
@@ -69,9 +72,16 @@
     const host=el('div','','md-received-viewer');host.hidden=true;
     const ctHeading=el('div','','md-received-ct-heading');ctHeading.append(el('h3','전달받은 CT'),el('p',r.none?'모델 참고 없음':'참고 모델: '+(Array.isArray(r.selected)?r.selected.map(k=>MD.labels[k]||'알 수 없는 모델').join(', '):'선택 기록 오류')));card.append(ctHeading,imageStatus);
     if(r.mode==='LOCAL_DEMO'){
-      const ct=button('전달 CT 보기',async()=>{
-        if(view){view.close();view=null;host.hidden=true;ct.textContent='전달 CT 보기';return;}
-        ct.disabled=true;imageStatus.textContent='보낼 때의 CT와 현재 CT가 같은지 확인 중…';card.dataset.bindingState='checking';
+      let biopsyActive=false;
+      const biopsyButton=button('조직검사 후보 표시',()=>toggleBiopsy(),'md-record-biopsy-button');
+      biopsyButton.setAttribute('aria-pressed','false');
+      biopsyButton.disabled=!r.biopsyCandidate;
+      biopsyButton.title=r.biopsyCandidate?'조직검사 후보 위치를 전달 CT에 표시합니다 · 표시 전용이며 판정·측정 아님':'이 기록에는 조직검사 후보가 기록되지 않았습니다.';
+      const ct=button('전달 CT 보기',()=>toggleCt(),'md-record-ct-button');
+      ct.setAttribute('aria-expanded','false');
+      async function openViewer(){
+        if(view)return view;
+        ct.disabled=true;biopsyButton.disabled=true;imageStatus.textContent='보낼 때의 CT와 현재 CT가 같은지 확인 중…';card.dataset.bindingState='checking';
         try{
           const response=await fetch('/data/model_compare/manifest.json',{cache:'no-store'});
           if(!response.ok)throw Error('Manifest unavailable');
@@ -79,15 +89,72 @@
           if(token!==generation)return;
           host.hidden=false;view=MDViewer.mount(host,canonical,r.none?['ct']:r.selected,r.viewpoint||null);
           if(r.none)host.querySelector('canvas')?.setAttribute('aria-label',`${canonical.id} CT · 모델 참고 없음 · 방향키 절편 이동`);
-          card.dataset.bindingState='verified';imageStatus.textContent='보낼 때의 CT와 일치합니다 · 선택한 모델만 표시합니다';ct.textContent='전달 CT 접기';
+          card.dataset.bindingState='verified';imageStatus.textContent='보낼 때의 CT와 일치합니다 · 선택한 모델만 표시합니다';ct.textContent='전달 CT 접기';ct.setAttribute('aria-expanded','true');
+          return view;
         }catch(_){
-          if(token!==generation)return;
+          if(token!==generation)return null;
           card.dataset.bindingState='mismatch';imageStatus.textContent='영상을 열 수 없습니다. 보낼 때의 CT와 현재 자료가 다르거나 확인할 수 없습니다. 전달 메모는 계속 볼 수 있습니다.';
-          host.hidden=true;host.replaceChildren();
-        }finally{if(token===generation)ct.disabled=false;}
-      },'md-record-ct-button');card.append(ct);
+          host.hidden=true;host.replaceChildren();view=null;ct.textContent='전달 CT 보기';ct.setAttribute('aria-expanded','false');
+          return null;
+        }finally{if(token===generation){ct.disabled=false;biopsyButton.disabled=!r.biopsyCandidate;}}
+      }
+      function closeViewer(){
+        if(view){view.close();view=null;}
+        host.hidden=true;biopsyActive=false;biopsyButton.setAttribute('aria-pressed','false');
+        ct.textContent='전달 CT 보기';ct.setAttribute('aria-expanded','false');
+      }
+      // The biopsy marker layer only exists inside a verified viewer, so the toggle
+      // reuses the same fail-closed binding check instead of mounting a second one.
+      async function toggleCt(){if(view){closeViewer();return;}await openViewer();}
+      async function toggleBiopsy(){
+        if(biopsyActive){biopsyActive=false;biopsyButton.setAttribute('aria-pressed','false');view?.setCandidates([],null);return;}
+        const opened=await openViewer();
+        if(!opened||!r.biopsyCandidate)return;
+        biopsyActive=true;biopsyButton.setAttribute('aria-pressed','true');
+        opened.setCandidates([r.biopsyCandidate],r.biopsyCandidate.candidateId);
+      }
+      const ctActions=el('div','','md-record-ct-actions');ctActions.append(ct,biopsyButton);card.append(ctActions);
       if(r.viewpoint != null)ct.click(); // Restore attached views after the same fail-closed binding check.
     }else{imageStatus.textContent='CT 없음 · 합성 워크플로 시연에는 실제 CT/마스크가 없습니다.';}
+    // A same-source earlier study is an inferred pairing for the demo, not a verified
+    // patient history, so the label states the basis and refuses to imply chronology.
+    if(r.priorStudy){
+      const prior=el('section','','md-prior-study');
+      prior.append(el('h3','이전 CT로 추정되는 검사'),
+        el('p',`추정 짝 · 검증된 이전 검사 아님 · 표시 사례 식별자 ${r.priorStudy.alias} · CT만 표시`,'md-prior-note'),
+        el('p',r.priorStudy.basis,'md-prior-note'),
+        el('p',`표시 촬영일 ${r.priorStudy.assumedDate||'기록 없음'}${r.priorStudy.dateIsAssumed?' · 시연용 가정값 · 실제 촬영일 아님':''}`,'md-prior-note'));
+      const priorStatus=el('p','','md-prior-status');priorStatus.setAttribute('role','status');
+      priorStatus.textContent='같은 원본에서 만든 추정 짝입니다. 환자 이력·경과 판단에 쓰지 마세요.';
+      const priorHost=el('div','','md-prior-viewer');priorHost.hidden=true;
+      async function togglePrior(){
+        if(priorView){priorView.close();priorView=null;priorHost.hidden=true;priorButton.textContent='이전 CT(추정) 보기';priorButton.setAttribute('aria-expanded','false');return;}
+        priorButton.disabled=true;priorStatus.textContent='추정 짝 영상을 확인 중…';
+        try{
+          const response=await fetch('/'+String(r.priorStudy.manifestPath||'').replace(/^\/+/,''),{cache:'no-store'});
+          if(!response.ok)throw Error('manifest unavailable');
+          const raw=await response.json();
+          const entry=Array.isArray(raw?.cases)?raw.cases.find(x=>x?.id===r.priorStudy.alias):null;
+          if(!entry||!Array.isArray(entry.slices)||!entry.slices.length||entry.slices.some(s=>typeof s?.ct!=='string'))throw Error('unexpected shape');
+          if(token!==generation)return;
+          priorHost.hidden=false;
+          priorView=MDViewer.mount(priorHost,{id:entry.id,slices:entry.slices.map(s=>({ct:s.ct}))},['ct'],null);
+          priorHost.querySelector('canvas')?.setAttribute('aria-label',`${entry.id} 이전 CT로 추정되는 검사 · 모델 오버레이 없음 · 방향키 절편 이동`);
+          priorButton.textContent='이전 CT(추정) 접기';priorButton.setAttribute('aria-expanded','true');
+          priorStatus.textContent=`${entry.slices.length}절편 · CT만 표시 · 모델 오버레이 없음 · 추정 짝`;
+        }catch(_){
+          if(token!==generation)return;
+          priorView=null;priorHost.hidden=true;priorHost.replaceChildren();
+          // The integrated server's exact asset allowlist covers data/model_compare only,
+          // so a real_cases study is refused here by design, not by a broken link.
+          priorStatus.textContent='추정 짝 영상을 열 수 없습니다. 이 서버가 제공하는 자산 목록에 이 검사가 없습니다. 추정 근거와 표시 촬영일은 그대로 남습니다.';
+        }finally{if(token===generation)priorButton.disabled=false;}
+      }
+      const priorButton=button('이전 CT(추정) 보기',()=>togglePrior(),'md-prior-button');
+      priorButton.setAttribute('aria-expanded','false');
+      prior.append(priorButton,priorStatus,priorHost);
+      card.append(prior);
+    }
     card.append(host,reference);
     const ackText=state.receipts[r.id]?'수신 확인됨 · '+state.receipts[r.id]:'수신 확인 (진료 판단 아님)';
     if(mode==='inbox'){

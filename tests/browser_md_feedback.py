@@ -1,5 +1,6 @@
 """Run against local integrated server, no downloads: python3 tests/browser_md_feedback.py."""
 import os
+import re
 from playwright.sync_api import expect, sync_playwright
 
 # Comparison runs launch the same suite against a second port.
@@ -22,6 +23,7 @@ with sync_playwright() as p:
         blocked.get_by_label('CAPPY2 current', exact=True).check()
         blocked.get_by_label('CAPPY2 050', exact=True).check()
         assert not blocked.get_by_label('모델 참고 없음', exact=True).is_checked()
+        blocked.get_by_label('기타(직접 입력)', exact=True).check()
         blocked.locator('textarea').fill('SYNTHETIC local draft only')
         page.keyboard.press('Escape')
         blocked.get_by_role('button', name='초안 보관하고 닫기').click()
@@ -62,7 +64,10 @@ with sync_playwright() as p:
     dialog.get_by_label('판단 유보', exact=True).check()
     dialog.get_by_label('재확인 필요', exact=True).check()
     assert dialog.locator('.md-viewpoint-options [value=attached]').is_disabled()
+    # Free text is only shown for '기타'; switch back so the stored opinion stays short-term.
+    dialog.get_by_label('기타(직접 입력)', exact=True).check()
     dialog.locator('textarea').fill('SYNTHETIC browser note')
+    dialog.get_by_label('단기 추적검사', exact=True).check()
     page.keyboard.press('Escape')
     dialog.get_by_role('button', name='초안 보관하고 닫기').click()
     # Reopen a pre-fix malformed draft after reload. Notes/token must survive;
@@ -158,6 +163,82 @@ with sync_playwright() as p:
         assert viewer.get_attribute('data-zoom')=='2'
         real.get_by_role('button',name='CT 접기',exact=True).click()
         assert viewer.locator('canvas').count()==0
+    # Review shortcuts on a real research case: candidate rows collapse, a biopsy opinion
+    # names its target, free text only opens for '기타', and the visit state is a demo value.
+    if real.count():
+        real.get_by_role('button', name='CT 확대', exact=True).click()
+        inline = real.locator('.md-inline-viewer')
+        assert inline.locator('canvas').count() == 4
+        toggle = inline.get_by_role('button', name='재검토 후보', exact=True)
+        real.get_by_role('button', name='주치의에게 전송하기').click()
+        dialog.get_by_label('LOCAL DEMO로 연구 CT를 로컬 전달하기 (실제 환자/주치의 연결·병원 전송 아님)', exact=True).check()
+        rows = dialog.locator('.md-candidate-row')
+        assert rows.count() >= 1
+        dialog.get_by_label('CAPPY2 current', exact=True).check()
+        dialog.get_by_label('CAPPY2 050', exact=True).check()
+        assert ' · 절편 ' in rows.first.inner_text()
+        rows.first.click()
+        assert rows.first.get_attribute('aria-pressed') == 'true'
+        preview_src = dialog.locator('.md-candidate-frame img').get_attribute('src') or ''
+        assert '/ct/' in preview_src and 'case_000' in preview_src, preview_src
+        mark_style = dialog.locator('.md-candidate-mark').get_attribute('style') or ''
+        assert 'left:' in mark_style and 'top:' in mark_style, mark_style
+        assert inline.get_by_role('button', name='재검토 후보', exact=True).get_attribute('aria-pressed') == 'true'
+        rows.first.click()
+        assert rows.first.get_attribute('aria-pressed') == 'false'
+        # A biopsy opinion has to name its target, so the picker only appears with it.
+        assert dialog.locator('.md-biopsy').is_hidden()
+        dialog.get_by_label('즉시 US 유도 조직검사', exact=True).check()
+        assert dialog.locator('.md-biopsy').is_visible()
+        assert dialog.locator('.md-biopsy select option').count() == rows.count() + 1
+        dialog.locator('.md-biopsy select').select_option(index=1)
+        assert dialog.locator('.md-biopsy select').input_value() != ''
+        # Free text stays behind '기타'; anything already typed is never hidden again.
+        assert dialog.locator('.md-notes-wrap').is_hidden()
+        dialog.get_by_label('기타(직접 입력)', exact=True).check()
+        assert dialog.locator('.md-notes-wrap').is_visible()
+        dialog.locator('textarea').fill('SYNTHETIC review shortcut memo')
+        dialog.get_by_label('즉시 US 유도 조직검사', exact=True).check()
+        assert dialog.locator('.md-notes-wrap').is_visible()
+        assert dialog.locator('textarea').input_value() == 'SYNTHETIC review shortcut memo'
+        # Leaving the biopsy opinion clears its target, so the MD must pick it again.
+        assert dialog.locator('.md-biopsy select').input_value() == ''
+        dialog.locator('.md-biopsy select').select_option(index=1)
+        assert dialog.locator('.md-biopsy select').input_value() != ''
+        assert dialog.locator('fieldset.md-visit').is_visible()
+        assert '시연용 가정값' in dialog.locator('fieldset.md-visit legend').inner_text()
+        dialog.get_by_role('button', name='LOCAL DEMO 보내기', exact=True).click()
+        assert not dialog.is_visible()
+        sent_link = page.locator('#mdSendResult a').get_attribute('href')
+        assert sent_link
+        page.goto(BASE + '/' + sent_link.lstrip('/'))
+        assert '금일 외래 미내원' in page.locator('.md-record-visit').inner_text()
+        biopsy_text = page.locator('.md-record-biopsy').inner_text()
+        assert '조직검사 후보 ·' in biopsy_text and ' · 절편 ' in biopsy_text, biopsy_text
+        biopsy_button = page.get_by_role('button', name='조직검사 후보 표시', exact=True)
+        assert biopsy_button.is_enabled() and biopsy_button.get_attribute('aria-pressed') == 'false'
+        biopsy_button.click()
+        expect(page.locator('.md-received-viewer')).to_have_attribute('data-load-state', 'ready')
+        assert biopsy_button.get_attribute('aria-pressed') == 'true'
+        assert page.locator('.md-received-viewer .md-candidate-toggle[aria-pressed="true"]').count() == 1
+        biopsy_button.click()
+        assert biopsy_button.get_attribute('aria-pressed') == 'false'
+        # The inferred earlier study is labelled as an estimate and opens CT-only.
+        prior = page.locator('.md-prior-study')
+        assert 'LL-CT-001' in prior.inner_text() and '2026-05-14' in prior.inner_text()
+        assert '추정 짝' in prior.inner_text() and '검증된 이전 검사 아님' in prior.inner_text()
+        prior_button = page.get_by_role('button', name='이전 CT(추정) 보기', exact=True)
+        prior_button.click()
+        # The integrated server only serves data/model_compare assets, so an estimated
+        # real_cases study has to fail closed with a stated reason rather than quietly
+        # substituting another patient's CT.
+        expect(page.locator('.md-prior-status')).to_have_text(re.compile('이 서버가 제공하는 자산 목록에 이 검사가 없습니다'))
+        assert page.locator('.md-prior-viewer canvas').count() == 0
+        assert prior_button.get_attribute('aria-expanded') == 'false'
+        assert 'LL-CT-001' in prior.inner_text()
+        page.goto(f'{BASE}/')
+        card.wait_for()
+        page.locator('#mdFilter').select_option('pending')
     # Functional structure at target widths; visual overflow is Astra's CSS QA.
     for width in (1440,768,390,320):
         page.set_viewport_size({'width':width,'height':900})
@@ -171,7 +252,7 @@ with sync_playwright() as p:
       const send=[...dl.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='DEMO 보내기'||b.textContent.trim()==='✈');
       const r=dl.getBoundingClientRect(), s=send?.getBoundingClientRect();
       return {dialogH:Math.round(r.height), scrollH:dl.scrollHeight,
-        labelHeights:[...dl.querySelectorAll('fieldset.md-followup label')].map(l=>Math.round(l.getBoundingClientRect().height)),
+        labelHeights:[...dl.querySelectorAll('fieldset.md-followup > label')].map(l=>Math.round(l.getBoundingClientRect().height)),
         docOverflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
     }''')
     assert geo['docOverflow'] <= 1, geo

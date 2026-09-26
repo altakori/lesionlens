@@ -82,7 +82,52 @@
     const precheckRadios={};for(const key of M.precheckOptions){const l=el('label',M.precheckLabels[key]),r=el('input');r.type='radio';r.name='md-precheck';r.value=key;r.checked=draft.precheck===key;r.onchange=()=>{if(!r.checked)return;draft.precheck=key;precheckClear.disabled=false;persist();};precheckRadios[key]=r;l.prepend(r);precheck.append(l);}
     const precheckClear=action('미작성으로 되돌리기',()=>{delete draft.precheck;for(const key of M.precheckOptions){precheckRadios[key].checked=false;}precheckClear.disabled=true;persist();});
     precheckClear.disabled=draft.precheck===undefined;precheckClear.className='md-precheck-clear';precheck.append(precheckClear);dialog.append(precheck);
-    if(e?.reasons.length){const candidates=el('ul',null,'md-send-candidates');for(const r of e.reasons)candidates.append(el('li',`${r.candidateId} · ${M.labels[r.model]} ↔ ${M.labels[r.otherModel]} · voxel ${r.voxel.join(', ')} · 절편 ${r.slice+1}`));dialog.append(candidates);}
+    // Model pairs repeat the same candidate; collapse to one row per candidate and
+    // let the row drive the CT marker layer instead of leaving the list as text only.
+    const candidates=M.reviewCandidates(e);let activeCandidate=null;
+    if(candidates.length){
+      const box=el('fieldset',null,'md-candidates');
+      box.append(el('legend',`재검토 후보 ${candidates.length}건 · 모델 쌍 ${e.reasons.length}행을 후보 단위로 합침 · 행을 누르면 CT에 표시`));
+      const rows={};
+      for(const k of candidates){
+        const b=action(M.candidateLabel(k),()=>{activeCandidate=activeCandidate===k.candidateId?null:k.candidateId;paintCandidates();});
+        b.className='md-candidate-row';b.dataset.candidateId=k.candidateId;b.setAttribute('aria-pressed','false');
+        const who=[(k.model&&M.labels[k.model])||'알 수 없는 모델',k.pairs.map(p=>M.labels[p]||p).join(', ')||'상대 모델 기록 없음'].join(' ↔ ');
+        b.title=who+' · voxel '+(k.voxel.length?k.voxel.join(', '):'기록 없음');
+        rows[k.candidateId]=b;box.append(b);
+      }
+      const candidateNote=el('p',null,'md-candidate-note');candidateNote.setAttribute('role','status');
+      // The dialog covers the CT behind it, so the marker has to render in here too.
+      const preview=el('figure',null,'md-candidate-preview');
+      const previewImg=el('img');previewImg.alt='';previewImg.hidden=true;
+      const previewMark=el('span',null,'md-candidate-mark');previewMark.hidden=true;
+      // The marker is placed in image space, so its box has to hug the image alone,
+      // not the figure that also carries the caption.
+      const previewFrame=el('div',null,'md-candidate-frame');previewFrame.append(previewImg,previewMark);
+      const previewCap=el('figcaption','후보를 고르면 이 절편의 CT에 후보 위치를 표시합니다. 표시 전용이며 HU·진단 정보가 아닙니다.','md-candidate-caption');
+      preview.append(previewFrame,previewCap);
+      box.append(candidateNote,preview);dialog.append(box);
+      async function paintPreview(k){
+        if(!k||k.slice===null||!c.slices?.[k.slice]?.ct){previewImg.hidden=true;previewMark.hidden=true;previewCap.textContent='절편 정보가 없어 미리보기를 표시하지 않습니다. 표시 전용이며 진단 정보가 아닙니다.';return;}
+        previewImg.src='/'+c.slices[k.slice].ct.replace(/^\/+/, '');
+        previewImg.alt=`${c.id} 절편 ${k.slice+1} · 후보 ${k.candidateId} 위치 표시`;
+        previewImg.hidden=false;
+        // Candidate voxel coordinates are 512x512 image space; the crosshair is a
+        // display-only marker, never a measurement.
+        const [vx,vy]=k.voxel;
+        if(Number.isFinite(vx)&&Number.isFinite(vy)){previewMark.style.left=(vx/512*100)+'%';previewMark.style.top=(vy/512*100)+'%';previewMark.hidden=false;}
+        else previewMark.hidden=true;
+        previewCap.textContent=`절편 ${k.slice+1} · ${k.candidateId} · voxel ${k.voxel.length?k.voxel.join(', '):'기록 없음'} · 표시 전용`;
+      }
+      function paintCandidates(){
+        for(const [id,b] of Object.entries(rows))b.setAttribute('aria-pressed',String(activeCandidate===id));
+        try{getViewer()?.setCandidates(candidates,activeCandidate);}catch(_){}
+        const k=candidates.find(x=>x.candidateId===activeCandidate)||null;
+        candidateNote.textContent=activeCandidate?`${activeCandidate} 표시 중 · 해당 절편으로 이동`:'후보 미선택 · CT에 표시 없음';
+        paintPreview(k);
+      }
+      paintCandidates();
+    }
     const viewpointGroup=el('fieldset',null,'md-viewpoint-options');viewpointGroup.append(el('legend','전달 화면 위치'));
     const basicLabel=el('label','기본 보기 (화면 위치 첨부 안 함)'),basic=el('input');basic.type='radio';basic.name='md-viewpoint';basic.value='basic';
     const attachLabel=el('label','현재 표시된 절편·확대·이동·표시 대비·오버레이 첨부 (기본값)'),attach=el('input');attach.type='radio';attach.name='md-viewpoint';attach.value='attached';
@@ -125,9 +170,45 @@
     const noLabel=el('label','모델 참고 없음'),none=el('input');none.type='checkbox';none.checked=draft.none;none.onchange=()=>{draft.none=none.checked;if(draft.none)draft.selected=[];persist();};noLabel.prepend(none);group.append(noLabel);dialog.append(group);
     const followup=el('fieldset',null,'md-followup');followup.append(el('legend','후속조치 의견  ·  MD 작성 · AI 자동 선택 아님'));
     const followupHint=el('p','메모에 원하는 후속조치를 직접 적어주세요.','md-followup-hint');followupHint.hidden=draft.followup!=='other';
-    const followupRadios={};for(const key of M.followupOptions){const l=el('label',M.followupLabels[key]),r=el('input');r.type='radio';r.name='md-followup';r.value=key;r.checked=draft.followup===key;r.onchange=()=>{if(!r.checked)return;draft.followup=key;followupHint.hidden=key!=='other';persist();};followupRadios[key]=r;l.prepend(r);followup.append(l);}
-    followup.append(followupHint);dialog.append(followup);
-    const notesLabel=el('label','MD 추가 소견·임상 메모 (로컬 초안 · 실제 전송 불가)'),notes=el('textarea');notes.value=draft.notes;notes.oninput=()=>{draft.notes=notes.value;persist();};notesLabel.append(notes);dialog.append(notesLabel,error);
+    const followupRadios={};for(const key of M.followupOptions){const l=el('label',M.followupLabels[key]),r=el('input');r.type='radio';r.name='md-followup';r.value=key;r.checked=draft.followup===key;r.onchange=()=>{if(!r.checked)return;draft.followup=key;if(key!=='immediate_us_biopsy'){delete draft.biopsy;biopsySelect.value='';}followupHint.hidden=key!=='other';syncFollowupVisibility();persist();};followupRadios[key]=r;l.prepend(r);followup.append(l);}
+    followup.append(followupHint);
+    // Biopsy needs a target, not a free-text hint: pick the candidate from a list.
+    const biopsyWrap=el('div',null,'md-biopsy');
+    const biopsyLabel=el('label','조직검사할 후보 (AI 자동 선택 아님)');
+    const biopsySelect=el('select');
+    const biopsyNone=el('option','후보 선택 안 함');biopsyNone.value='';biopsySelect.append(biopsyNone);
+    for(const k of candidates){const o=el('option',M.candidateLabel(k));o.value=k.candidateId;biopsySelect.append(o);}
+    biopsySelect.value=draft.biopsy||'';
+    if(!draft.biopsy)delete draft.biopsy;
+    biopsySelect.onchange=()=>{if(biopsySelect.value)draft.biopsy=biopsySelect.value;else delete draft.biopsy;persist();};
+    biopsyLabel.append(biopsySelect);
+    const biopsyNote=el('p',candidates.length?'AI가 후보를 고르지 않습니다. 아래 목록에서 직접 선택하세요. 선택은 표시 전용이며 판정·측정이 아닙니다.':'이 사례에는 표시할 재검토 후보가 없어 조직검사 후보를 고를 수 없습니다.','md-biopsy-note');
+    biopsyWrap.append(biopsyLabel,biopsyNote);followup.append(biopsyWrap);
+    dialog.append(followup);
+    const notesLabel=el('label','MD 추가 소견·임상 메모 (로컬 초안 · 실제 전송 불가)'),notes=el('textarea');notes.value=draft.notes;notes.oninput=()=>{draft.notes=notes.value;persist();};notesLabel.append(notes);
+    const notesWrap=el('div',null,'md-notes-wrap');notesWrap.append(notesLabel);dialog.append(notesWrap,error);
+    // The clinical note is only useful as free text next to "기타". Already-written
+    // notes stay visible so nothing the MD typed is hidden away.
+    function syncFollowupVisibility(){
+      const biopsy=draft.followup==='immediate_us_biopsy';
+      biopsyWrap.hidden=!biopsy;
+      biopsyNote.hidden=!biopsy;
+      notesWrap.hidden=!(draft.followup==='other'||draft.notes.trim());
+    }
+    syncFollowupVisibility();
+    const visit=M.visitStatus(c);
+    const visitBox=el('fieldset',null,'md-visit');
+    visitBox.append(el('legend','환자 내원 정보  ·  시연용 가정값 · 실제 환자 데이터 아님'));
+    visitBox.append(el('p',M.visitLabel(visit),'md-visit-status'));
+    if(visit==='scheduled_not_visited'){
+      const l=el('label','주치의에게 외래 요청 요청 (발송 아님 · 기록만 남김)'),cb=el('input');
+      cb.type='checkbox';cb.checked=draft.visitRequest===true;
+      cb.onchange=()=>{if(cb.checked)draft.visitRequest=true;else delete draft.visitRequest;persist();};
+      l.prepend(cb);visitBox.append(l);
+    } else {
+      visitBox.append(el('p','미내원 사례가 아니라 외래 요청 선택지는 없습니다.','md-visit-note'));
+    }
+    dialog.append(visitBox);
     const send=action('✈',()=>{if(busy||!allowed||!validViewpoint()||!M.selection(c,draft.selected,draft.none))return;busy=true;send.disabled=true;try{
       const record=records.send(c,draft,e,researchEnvelope?'LOCAL_DEMO':'DEMO',researchEnvelope);
       dialog.close();refresh();say('LOCAL DEMO 저장 확인 완료 · 실제 병원 전송 아님');
@@ -147,7 +228,7 @@
     if(JSON.stringify(savedDraft)!==JSON.stringify(draft) && (savedDraft !== undefined || draft.viewpoint))persist();
     const confirm=el('section',null,'md-discard-confirm');confirm.hidden=true;confirm.tabIndex=-1;confirm.setAttribute('role','alert');confirm.append(el('p','작성한 초안을 폐기할까요?'),action('계속 작성',()=>{confirm.hidden=true;notes.focus();}),action('초안 보관하고 닫기',()=>{syncReferences();try{records.draft(c.id,draft);dialog.close();}catch(_){error.textContent='초안 저장 실패 · 닫지 않았습니다.';}}),action('폐기하고 닫기',()=>{try{records.discard(c.id);dialog.close();}catch(_){error.textContent='초안 폐기 실패';}}));dialog.append(confirm);
     dialog.oncancel=event=>{event.preventDefault();close();};dialog.onclick=event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}};
-    dialog.onclose=()=>{unsubscribe?.();try{state=readState();}catch(_){}if(focusAfterClose?.isConnected)focusAfterClose.focus();else if(trigger.isConnected)trigger.focus();else filter.focus();};dialog.showModal();notes.focus();
+    dialog.onclose=()=>{try{getViewer()?.setCandidates([],null);}catch(_){}unsubscribe?.();try{state=readState();}catch(_){}if(focusAfterClose?.isConnected)focusAfterClose.focus();else if(trigger.isConnected)trigger.focus();else filter.focus();};dialog.showModal();notes.focus();
   }
   filter.onchange=search.oninput=render;
   window.addEventListener('storage',event=>{if(event.key===records?.key)refresh();});render();

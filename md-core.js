@@ -45,6 +45,8 @@
       notes: typeof saved.notes === 'string' ? saved.notes : '',
       ...(Object.hasOwn(followupLabels, saved.followup) ? {followup:saved.followup} : {}),
       ...(Object.hasOwn(precheckLabels, saved.precheck) ? {precheck:saved.precheck} : {}),
+      ...(typeof saved.biopsy === 'string' && saved.biopsy ? {biopsy:saved.biopsy} : {}),
+      ...(saved.visitRequest === true ? {visitRequest:true} : {}),
       ...normalizeReferences(c, saved.selected, saved.none),
       ...(['auto','basic'].includes(saved.viewpointChoice) ? {viewpointChoice:saved.viewpointChoice} : {}),
       ...(saved.viewpoint != null ? {viewpoint:clone(saved.viewpoint)} : {})};
@@ -133,6 +135,18 @@
         const viewpoint = validateViewpoint(draft.viewpoint, c, research ? envelope.binding : null);
         if (draft.followup !== undefined && (typeof draft.followup !== 'string' || !followupOptions.includes(draft.followup))) throw Error('Invalid followup opinion');
         if (draft.precheck !== undefined && (typeof draft.precheck !== 'string' || !precheckOptions.includes(draft.precheck))) throw Error('Invalid pre-opinion record');
+        // A biopsy target must be a candidate of this case at this moment; an unknown
+        // id fails closed instead of storing a pointer that later resolves to nothing.
+        const candidates = reviewCandidates(evidence);
+        let biopsyCandidate;
+        if (draft.biopsy !== undefined) {
+          const hit = candidates.find(k => k.candidateId === draft.biopsy);
+          if (!hit) throw Error('Invalid biopsy candidate');
+          biopsyCandidate = {candidateId:hit.candidateId, model:hit.model, voxel:hit.voxel.slice(), slice:hit.slice, small:hit.small};
+        }
+        const visit = visitStatus(c);
+        if (draft.visitRequest !== undefined && draft.visitRequest !== true) throw Error('Invalid outpatient request');
+        if (draft.visitRequest === true && visit !== 'scheduled_not_visited') throw Error('Outpatient request requires a not-visited case');
         const existing = read().sends[draft.id];
         if (existing) {
           if (existing.case.id !== c.id || existing.mode !== mode) throw Error('Idempotency conflict');
@@ -141,6 +155,9 @@
         const record = {id:draft.id, mode, scope, dataKind:research?'research-ct':'synthetic-no-ct', case:clone(c), selected:clone(draft.selected), none:draft.none,
           ...(draft.followup !== undefined ? {followup:draft.followup} : {}),
           ...(draft.precheck !== undefined ? {precheck:draft.precheck} : {}),
+          ...(biopsyCandidate ? {biopsyCandidate} : {}),
+          visit:{status:visit, requested:draft.visitRequest === true},
+          priorStudy:research ? priorStudyFor(c) : null,
           viewpoint, notes:draft.notes, evidence:clone(evidence || null), summary:'생성형 AI 소견 없음',
           sender:research?'LOCAL DEMO MD':'DEMO MD', time:new Date().toISOString(),
           recipient:research?{role:'LOCAL DEMO 임상 담당자',demo:true,patientMapping:null}:clone(c.mapping),
@@ -153,6 +170,70 @@
       },
       receipt(id) { return write(s => { if (!isLocalRecord(s.sends[id])) throw Error('Missing DEMO record'); s.receipts[id] ||= new Date().toISOString(); }); }
     };
+  }
+  // Evidence repeats one row per disagreeing model pair, which buries the list on
+  // cases with many candidates. Reviewers act on a candidate, not on a pair, so the
+  // list collapses by candidateId and keeps the counterpart models for detail.
+  function reviewCandidates(e) {
+    if (!e || !Array.isArray(e.reasons)) return [];
+    const byId = new Map();
+    for (const r of e.reasons) {
+      if (!r || typeof r.candidateId !== 'string' || !r.candidateId) continue;
+      let item = byId.get(r.candidateId);
+      if (!item) {
+        item = {candidateId:r.candidateId, model:typeof r.model === 'string' ? r.model : null,
+          voxel:Array.isArray(r.voxel) ? r.voxel.slice(0,3) : [],
+          slice:Number.isInteger(r.slice) ? r.slice : null, small:!!r.smallAdditional, pairs:[]};
+        byId.set(r.candidateId, item);
+      }
+      if (typeof r.otherModel === 'string' && !item.pairs.includes(r.otherModel)) item.pairs.push(r.otherModel);
+      if (r.smallAdditional) item.small = true;
+    }
+    return [...byId.values()].sort((a,b) => (a.slice ?? 0) - (b.slice ?? 0) || a.candidateId.localeCompare(b.candidateId));
+  }
+  function candidateLabel(item) {
+    if (!item) return '';
+    const slice = item.slice === null ? '절편 알 수 없음' : `절편 ${item.slice + 1}`;
+    return `${item.candidateId} · ${slice}${item.small ? ' · 작은 추가 후보' : ''}`;
+  }
+  // Demo-only visit scenario. Derived from the case id so a reload cannot change it
+  // mid-demo; this is never real patient data and never leaves the browser.
+  const visitOptions = ['visited_today','scheduled_not_visited','no_visit'];
+  const visitLabels = {visited_today:'금일 내원 확인', scheduled_not_visited:'금일 외래 미내원', no_visit:'내원 일정 없음'};
+  function visitLabel(value) {
+    if (value === undefined) return '이 전송에는 내원 정보 기록이 없습니다.';
+    if (typeof value !== 'string' || !Object.hasOwn(visitLabels, value)) return '읽을 수 없는 내원 정보';
+    return visitLabels[value];
+  }
+  function visitStatus(c) {
+    if (!c || typeof c.id !== 'string' || !c.id) return 'no_visit';
+    let hash = 2166136261;
+    for (const ch of c.id) hash = ((hash ^ ch.codePointAt(0)) * 16777619) >>> 0;
+    return visitOptions[hash % visitOptions.length];
+  }
+  // Prior-study pairing for the local demo. LL-CT-001 is a slice-window crop of the
+  // same LiTS source volume as case_000 (see data/real_cases/LOCAL_PROVENANCE.json),
+  // so it is a real derived pair, but it is NOT a verified earlier exam of a patient
+  // and every acquisition date here is a demo placeholder. The integrated server's
+  // exact asset allowlist does not publish data/real_cases yet, so the receiver side
+  // shows this pairing as metadata and refuses to open the images rather than
+  // substituting another case's CT.
+  const priorStudies = {
+    case_000:{alias:'LL-CT-001', manifestPath:'data/real_cases/manifest.json',
+      basis:'같은 원본 볼륨(sourceCaseId 000)에서 절편 50–73만 잘라 만든 시연용 짝 · 환자 검사가 아님',
+      assumedDate:'2026-05-14'}
+  };
+  function priorStudyFor(c) {
+    const entry = c && priorStudies[c.id];
+    if (!entry) return null;
+    return {kind:'demo-prior-study-v1', caseId:c.id, alias:entry.alias, manifestPath:entry.manifestPath,
+      basis:entry.basis, assumedDate:entry.assumedDate, dateIsAssumed:true};
+  }
+  function biopsyCandidateLabel(v) {
+    if (v === undefined) return '이 전송에는 조직검사 후보가 기록되지 않았습니다.';
+    if (!v || typeof v.candidateId !== 'string' || !v.candidateId) return '읽을 수 없는 조직검사 후보';
+    const slice = Number.isInteger(v.slice) ? `절편 ${v.slice + 1}` : '절편 알 수 없음';
+    return `${v.candidateId} · ${slice}${v.small ? ' · 작은 추가 후보' : ''}`;
   }
   function reason(e) {
     if (!e) return '모델 비교 근거 미산출';
@@ -170,6 +251,7 @@
     const hash = await g.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
   }
-  const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
+  const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,reviewCandidates,candidateLabel,biopsyCandidateLabel,
+    visitOptions,visitLabels,visitLabel,visitStatus,priorStudies,priorStudyFor,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);

@@ -5,6 +5,8 @@
     const doc=host.ownerDocument;
     const node=(tag,text) => {const n=doc.createElement(tag); if(text) n.textContent=text; return n;};
     let epoch=0, closed=false, slice=0, displayedSlice=null, pendingSlice=null, phase='idle', failure='', zoom=1, x=0, y=0, contrast=1, visible=true, mode='seg', loaded=[];
+    // Review markers are a transient display aid and never enter a saved viewpoint.
+    let markers=[], markerActive=null, markersVisible=true;
     const inFlight=new Set(), listeners=new Set();
     const boundedPan=v=>Math.max(-2048,Math.min(2048,v));
     // The caller verifies manifest identity; validate numeric bounds here too.
@@ -30,6 +32,11 @@
       modeButtons.push(button);modes.append(button);
     }
     controls.append(modes);
+    const markerToggle=node('button','재검토 후보');markerToggle.type='button';markerToggle.className='md-candidate-toggle';
+    markerToggle.setAttribute('aria-pressed',String(markersVisible));
+    markerToggle.title='모델 불일치 후보 위치를 표시 전용 마커로 보입니다 · 판정·측정 아님';
+    markerToggle.onclick=()=>{markersVisible=!markersVisible;markerToggle.setAttribute('aria-pressed',String(markersVisible));draw();};
+    controls.append(markerToggle);
     const eye=node('button');eye.type='button';eye.className='md-overlay-eye';
     eye.setAttribute('aria-label','모든 패널 오버레이 표시');eye.setAttribute('aria-pressed',String(visible));eye.title=visible?'모든 패널 오버레이 숨기기':'모든 패널 오버레이 복원';
     const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -70,7 +77,16 @@
     }
     function draw(){if(closed)return;x=boundedPan(x);y=boundedPan(y);host.dataset.slice=displayedSlice===null?'':String(displayedSlice);host.dataset.zoom=String(zoom);host.dataset.panX=String(x);host.dataset.panY=String(y);host.dataset.contrast=String(contrast);host.dataset.overlayMode=mode;host.dataset.overlayVisible=String(visible);panels.forEach((p,i)=>{const ctx=p.canvas.getContext('2d');p.canvas.dataset.slice=displayedSlice===null?'':String(displayedSlice);p.canvas.dataset.caseId=c.id;const data=loaded[i];if(!data)return;p.canvas.hidden=false;ctx.clearRect(0,0,512,512);
       ctx.save();ctx.translate(256+x,256+y);ctx.scale(zoom,zoom);ctx.translate(-256,-256);ctx.filter=`contrast(${contrast})`;ctx.drawImage(data.ct,0,0,512,512);ctx.filter='none';
-      if(visible&&data.overlay){const o=data.overlay;if(mode==='box'){for(const b of o.boxes){const rect=[b[0]*512/o.w,b[1]*512/o.h,b[2]*512/o.w,b[3]*512/o.h];ctx.strokeStyle='#071019';ctx.lineWidth=6/zoom;ctx.strokeRect(...rect);ctx.strokeStyle='#00ffe6';ctx.lineWidth=3/zoom;ctx.strokeRect(...rect);}}else if(mode==='outline'){ctx.shadowColor='#000';ctx.shadowBlur=4;for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1],[0,0]])ctx.drawImage(o.outline,dx/zoom,dy/zoom,512,512);ctx.shadowBlur=0;ctx.drawImage(o.outline,0,0,512,512);}else ctx.drawImage(o.seg,0,0,512,512);}ctx.restore();});notify();}
+      if(visible&&data.overlay){const o=data.overlay;if(mode==='box'){for(const b of o.boxes){const rect=[b[0]*512/o.w,b[1]*512/o.h,b[2]*512/o.w,b[3]*512/o.h];ctx.strokeStyle='#071019';ctx.lineWidth=6/zoom;ctx.strokeRect(...rect);ctx.strokeStyle='#00ffe6';ctx.lineWidth=3/zoom;ctx.strokeRect(...rect);}}else if(mode==='outline'){ctx.shadowColor='#000';ctx.shadowBlur=4;for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1],[0,0]])ctx.drawImage(o.outline,dx/zoom,dy/zoom,512,512);ctx.shadowBlur=0;ctx.drawImage(o.outline,0,0,512,512);}else ctx.drawImage(o.seg,0,0,512,512);}
+      if(markersVisible&&markers.length){for(const m of markers){
+        if(!m||m.slice!==displayedSlice)continue;const v=Array.isArray(m.voxel)?m.voxel:[];
+        if(!Number.isFinite(v[0])||!Number.isFinite(v[1]))continue;
+        const on=m.candidateId===markerActive,arm=9/zoom;
+        ctx.save();ctx.strokeStyle=on?'#ffd166':'#8a93a8';ctx.lineWidth=(on?3:2)/zoom;
+        ctx.beginPath();ctx.moveTo(v[0]-arm,v[1]);ctx.lineTo(v[0]+arm,v[1]);ctx.moveTo(v[0],v[1]-arm);ctx.lineTo(v[0],v[1]+arm);ctx.stroke();
+        if(on){ctx.beginPath();ctx.arc(v[0],v[1],15/zoom,0,Math.PI*2);ctx.stroke();}
+        ctx.restore();}}
+      ctx.restore();});notify();}
     function describeFrame(){
       if(closed)return;
       host.dataset.slice=displayedSlice===null?'':String(displayedSlice);
@@ -137,6 +153,15 @@
     draw();load();return {
       capture:frame,
       state(){return {displayedSlice,pendingSlice,phase};},
+      // Re-review candidates from model disagreement, drawn as display-only markers.
+      setCandidates(items,activeId){
+        markers=Array.isArray(items)?items:[];
+        markerActive=typeof activeId==='string'?activeId:null;
+        if(markerActive){markersVisible=true;markerToggle.setAttribute('aria-pressed','true');}
+        const hit=markers.find(k=>k&&k.candidateId===markerActive);
+        if(hit&&Number.isInteger(hit.slice)&&hit.slice>=0&&hit.slice<c.slices.length&&hit.slice!==slice){slice=hit.slice;slider.value=slice;return load().then(()=>draw());}
+        draw();
+      },
       subscribe(fn){listeners.add(fn);return ()=>listeners.delete(fn);},
       close(){if(closed)return;closed=true;epoch++;cancelLoads();loaded=[];displayedSlice=pendingSlice=null;host.replaceChildren();host.dataset.slice='';host.dataset.pendingSlice='';host.dataset.requestedSlice='';host.dataset.loadState='closed';host.setAttribute('aria-busy','false');notify();listeners.clear();},
       setSlice(v){if(closed)return;const value=Number(v);slice=Math.max(0,Math.min(Math.max(0,c.slices.length-1),Number.isFinite(value)?Math.trunc(value):0));slider.value=slice;return load();}

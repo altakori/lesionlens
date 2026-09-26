@@ -199,3 +199,76 @@ test('an unrecognised follow-up value is refused and leaves no send record',asyn
  assert.equal(s.read().sends['bad-followup'],undefined);
  assert.equal(Object.keys(s.read().sends).length,0);
 });
+
+// Model pairs are the evidence rows, not the review list: one candidate repeats across
+// disagreeing pairs, which is what made the candidate list unreadable on case_035.
+const evidenceOf=(...rows)=>({models:{},pairs:[],missingModels:[],reasons:rows});
+const pair=(candidateId,model,otherModel,slice,extra={})=>({kind:'model_disagreement',candidateId,model,otherModel,voxel:[10,20,slice],slice,smallAdditional:false,...extra});
+
+test('review candidates collapse model-pair rows into one row per candidate and keep counterparts',()=>{
+ const e=evidenceOf(
+  pair('cp050:3','cappyv2','cp050',174),
+  pair('cp050:3','cappyv2','cp050',174),
+  pair('cp050:3','cappyv2','lesionfinder',174),
+  pair('cp012:1','cp050','cappyv2',9,{smallAdditional:true}),
+  {kind:'forged'},null,{candidateId:''});
+ const k=M.reviewCandidates(e);
+ assert.equal(e.reasons.filter(r=>r&&r.candidateId).length,4);
+ assert.deepEqual(k.map(x=>x.candidateId),['cp012:1','cp050:3']);
+ assert.deepEqual(k[1].pairs,['cp050','lesionfinder']);
+ assert.equal(k[1].voxel.join(','),'10,20,174');
+ assert.equal(k[0].small,true);assert.equal(k[1].small,false);
+ assert.deepEqual(M.reviewCandidates(null),[]);assert.deepEqual(M.reviewCandidates({reasons:[]}),[]);
+ assert.equal(M.candidateLabel(k[1]),'cp050:3 · 절편 175');
+ assert.equal(M.candidateLabel(k[0]),'cp012:1 · 절편 10 · 작은 추가 후보');
+ assert.equal(M.candidateLabel({candidateId:'cp9',slice:null,small:false}),'cp9 · 절편 알 수 없음');
+});
+
+test('a biopsy target is validated against this case\'s candidates and stored immutably',async()=>{
+ const {c,context,scope}=await setup(),storage=memory(),s=M.store(storage,scope);
+ const e=evidenceOf(pair('cp050:3','cappyv2','cp050',174),pair('cp050:3','cappyv2','lesionfinder',174));
+ const d={...draft('biopsy-send'),followup:'immediate_us_biopsy',biopsy:'cp050:3'};
+ const r=s.send(c,d,e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.deepEqual(r.biopsyCandidate,{candidateId:'cp050:3',model:'cappyv2',voxel:[10,20,174],slice:174,small:false});
+ assert.equal(M.biopsyCandidateLabel(r.biopsyCandidate),'cp050:3 · 절편 175');
+ d.biopsy='cp999';d.followup='other';
+ assert.equal(JSON.stringify(M.store(storage,scope).read().sends[r.id]),JSON.stringify(r));
+ assert.throws(()=>s.send(c,{...draft('biopsy-unknown'),biopsy:'cp999'},e,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid biopsy candidate/);
+ assert.throws(()=>s.send(c,{...draft('biopsy-no-evidence'),biopsy:'cp050:3'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid biopsy candidate/);
+ assert.equal(s.read().sends['biopsy-unknown'],undefined);assert.equal(s.read().sends['biopsy-no-evidence'],undefined);
+ assert.equal(M.store(storage,scope).read().sends[r.id].biopsyCandidate.voxel.join(','),'10,20,174');
+ assert.equal(M.biopsyCandidateLabel(undefined),'이 전송에는 조직검사 후보가 기록되지 않았습니다.');
+ assert.equal(M.biopsyCandidateLabel({candidateId:42}),'읽을 수 없는 조직검사 후보');
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{...draft(),biopsy:''}),'biopsy'),false);
+ assert.equal(M.normalizeDraft(M.demo,{...draft(),biopsy:'cp050:3'}).biopsy,'cp050:3');
+ assert.equal(Object.hasOwn(M.normalizeDraft(M.demo,{...draft(),visitRequest:false}),'visitRequest'),false);
+ assert.equal(M.normalizeDraft(M.demo,{...draft(),visitRequest:true}).visitRequest,true);
+});
+
+test('outpatient request is accepted only for a not-visited demo case and stored as a request, not a send',async()=>{
+ const {c,cases,context,scope}=await setup(),s=M.store(memory(),scope);
+ assert.equal(M.visitStatus(c),'scheduled_not_visited');
+ const visited=cases.find(x=>M.visitStatus(x)!=='scheduled_not_visited');assert.ok(visited);
+ const r=s.send(c,{...draft('visit-send'),visitRequest:true},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.deepEqual(r.visit,{status:'scheduled_not_visited',requested:true});
+ assert.equal(M.visitLabel(r.visit.status),'금일 외래 미내원');
+ const plain=s.send(c,draft('visit-plain'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true));
+ assert.deepEqual(plain.visit,{status:'scheduled_not_visited',requested:false});
+ assert.throws(()=>s.send(visited,{...draft('visit-wrong'),visitRequest:true},null,'LOCAL_DEMO',M.localDemoEnvelope(visited,context,true)),/Outpatient request requires a not-visited case/);
+ assert.equal(s.read().sends['visit-wrong'],undefined);
+ assert.throws(()=>s.send(c,{...draft('visit-bad-value'),visitRequest:'yes'},null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)),/Invalid outpatient request/);
+ assert.equal(M.visitStatus({id:c.id}),M.visitStatus(c));
+ assert.equal(M.visitLabel(undefined),'이 전송에는 내원 정보 기록이 없습니다.');
+ assert.equal(M.visitLabel('admitted_yesterday'),'읽을 수 없는 내원 정보');
+});
+
+test('prior study pairing is a labelled demo crop of the same source volume, never a patient history',async()=>{
+ const {c,cases,context,scope}=await setup(),s=M.store(memory(),scope);
+ const p=M.priorStudyFor(c);
+ assert.equal(p.caseId,'case_000');assert.equal(p.alias,'LL-CT-001');assert.equal(p.dateIsAssumed,true);
+ assert.equal(p.manifestPath,'data/real_cases/manifest.json');assert.match(p.basis,/환자 검사가 아님/);
+ assert.deepEqual(s.send(c,draft('prior-send'),null,'LOCAL_DEMO',M.localDemoEnvelope(c,context,true)).priorStudy,p);
+ const other=cases.find(x=>x.id!=='case_000');
+ assert.equal(M.priorStudyFor(other),null);
+ assert.equal(s.send(other,draft('prior-other'),null,'LOCAL_DEMO',M.localDemoEnvelope(other,context,true)).priorStudy,null);
+});
