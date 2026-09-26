@@ -4,16 +4,19 @@ const M=require('../md-core.js'), app=require('../app.js');
 if(!globalThis.crypto)globalThis.crypto=require('node:crypto').webcrypto;
 // Code-only full-schema fixture. No source scans or image bytes are read.
 function fixture(){
- return {version:app.MANIFEST_VERSION,localOnly:true,caseCount:5,windowHu:[-150,250],cases:app.CASE_SPECS.map(([id,depth,voxels])=>{
-  const counts={gt:voxels,...Object.fromEntries(app.MODELS.slice(0,id==='case_045'?0:3).map((k,j)=>[k,app.MODEL_VOXELS[id][j]]))};
-  const stats=Object.fromEntries(Object.entries(counts).map(([k,n])=>[k,{voxels:n,volumeMl:n*.002,componentCount:1,componentVolumesMl:[n*.002],positiveSliceCount:1,sliceSpan:[3,3]}]));
-  return {id,sourceCaseId:id,sliceCount:depth,dimensions:[512,512,depth],spacing:[1,1,2],tumorVolumeMl:voxels*.002,defaultSlice:2,gt:stats.gt,models:Object.fromEntries(Object.entries(stats).filter(([k])=>k!=='gt')),
-   disagreement:id==='case_045'?null:{intersectionVoxels:0,unionVoxels:app.MODEL_VOXELS[id].reduce((a,b)=>a+b,0),score:1},
-   slices:Array.from({length:depth},(_,z)=>({index:z+1,canonicalSlice:z,width:512,height:512,gtPixels:z===2?voxels:0,ct:`data/model_compare/web/${id}/ct/${String(z+1).padStart(3,'0')}.webp`,ctSha256:'a'.repeat(64),overlays:Object.fromEntries(Object.keys(counts).map(k=>[k,{path:`data/model_compare/web/${id}/${k}/${String(z+1).padStart(3,'0')}.png`,sha256:'b'.repeat(64)}])),pixels:Object.fromEntries(Object.entries(counts).map(([k,n])=>[k,z===2?n:0]))}))};
+ return {version:app.MANIFEST_VERSION,localOnly:true,caseCount:app.CASE_SPECS.length,windowHu:[-150,250],cases:app.CASE_SPECS.map(([id,depth,voxels])=>{
+  const counts={gt:voxels,...Object.fromEntries(app.caseArms(id).map((k,j)=>[k,app.MODEL_VOXELS[id][j]]))};
+  const planes={};
+  for (const [k,n] of Object.entries(counts)) { const a=new Array(depth).fill(0); let r=n,z=2; while(r>0&&z<Math.min(depth,14)){const v=Math.min(r,262144);a[z]=v;r-=v;z++;} planes[k]=a; }
+  const hits=k=>planes[k].flatMap((n,z)=>n?[z+1]:[]);
+  const stats=Object.fromEntries(Object.entries(counts).map(([k,n])=>{const p=hits(k);return [k,{voxels:n,volumeMl:n*.002,componentCount:n?1:0,componentVolumesMl:n?[n*.002]:[],positiveSliceCount:p.length,sliceSpan:p.length?[p[0],p.at(-1)]:null}];}));
+  return {id,sourceCaseId:id,sliceCount:depth,dimensions:[512,512,depth],spacing:[1,1,2],tumorVolumeMl:voxels*.002,defaultSlice:planes.gt.indexOf(Math.max(...planes.gt)),gt:stats.gt,models:Object.fromEntries(Object.entries(stats).filter(([k])=>k!=='gt')),
+   disagreement:id==='case_045'?null:{intersectionVoxels:0,unionVoxels:app.MODEL_VOXELS[id].reduce((a,b) => a+b,0),score:app.MODEL_VOXELS[id].reduce((a,b)=>a+b,0) ? 1 : 0},
+   slices:Array.from({length:depth},(_,z)=>({index:z+1,canonicalSlice:z,width:512,height:512,gtPixels:planes.gt[z],ct:`data/model_compare/web/${id}/ct/${String(z+1).padStart(3,'0')}.webp`,ctSha256:'a'.repeat(64),overlays:Object.fromEntries(Object.keys(counts).map(k=>[k,{path:`data/model_compare/web/${id}/${k}/${String(z+1).padStart(3,'0')}.png`,sha256:'b'.repeat(64)}])),pixels:Object.fromEntries(Object.keys(counts).map(k=>[k,planes[k][z]]))}))};
  })};
 }
 function memory(){const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};}
-async function setup(){const raw=fixture(),text=JSON.stringify(raw),scope=await M.digest(text),cases=app.normalizeManifest(raw);assert.equal(cases.length,5);return {text,scope,c:cases[0],cases,context:{manifestSha256:scope,manifestVersion:raw.version,cases}};}
+async function setup(){const raw=fixture(),text=JSON.stringify(raw),scope=await M.digest(text),cases=app.normalizeManifest(raw);assert.equal(cases.length,app.CASE_SPECS.length);return {text,scope,c:cases[0],cases,context:{manifestSha256:scope,manifestVersion:raw.version,cases}};}
 const draft=(id='research-send')=>({id,notes:'SYNTHETIC TEST memo',selected:['cappyv2','cp050'],none:false});
 
 test('research send requires explicit separate envelope; no real mode or mutation of patient mapping',async()=>{

@@ -21,29 +21,45 @@ CT = png((90,90,90,255))
 MASK = png((0,255,230,120))
 
 
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+import compare_manifest as schema
+
+
 def manifest_fixture():
     # Fixed production schema, entirely synthetic metadata/pixels for UI tests.
-    specs = [('case_000',75,2591),('case_001',123,7194),('case_035',124,20318),('case_045',74,4539),('case_048',244,35478)]
-    models = ['baseline','cappyv2','cp050']
-    counts_by_case = {'case_000':[2359,2483,2517],'case_001':[9499,9968,10472],'case_035':[31587,8885,72907],'case_048':[29641,30044,30495]}
+    specs = [(cid, value[0], value[1]) for cid, value in schema.CASES.items()]
+    counts_by_case = {cid: list(value) for cid, value in schema.MODEL_VOXELS.items()}
     cases = []
     for cid,depth,gt in specs:
+        models = list(schema.arms_for(cid))
         counts = {'gt':gt, **dict(zip(models, counts_by_case.get(cid, [])))}
-        stats = {k:{'voxels':n,'volumeMl':n*.002,'componentCount':1,'componentVolumesMl':[n*.002],'positiveSliceCount':1,'sliceSpan':[3,3]} for k,n in counts.items()}
+        planes = {}
+        for k,n in counts.items():
+            plane, left, z = [0]*depth, n, 2
+            while left and z < min(depth,14):
+                take = min(left, 512*512); plane[z] = take; left -= take; z += 1
+            planes[k] = plane
+        stats = {}
+        for k,n in counts.items():
+            hits = [i+1 for i,v in enumerate(planes[k]) if v]
+            stats[k] = {'voxels':n,'volumeMl':n*.002,'componentCount':1 if n else 0,
+                        'componentVolumesMl':[n*.002] if n else [],'positiveSliceCount':len(hits),
+                        'sliceSpan':[hits[0],hits[-1]] if hits else None}
         rows = []
         for z in range(depth):
             base = f'data/model_compare/web/{cid}'
-            rows.append({'index':z+1,'canonicalSlice':z,'width':512,'height':512,'gtPixels':gt if z==2 else 0,
+            rows.append({'index':z+1,'canonicalSlice':z,'width':512,'height':512,'gtPixels':planes['gt'][z],
                          'ct':f'{base}/ct/{z+1:03d}.webp','ctSha256':hashlib.sha256(CT).hexdigest(),
                          'overlays':{k:{'path':f'{base}/{k}/{z+1:03d}.png','sha256':hashlib.sha256(MASK).hexdigest()} for k in counts},
-                         'pixels':{k:n if z==2 else 0 for k,n in counts.items()}})
+                         'pixels':{k:plane[z] for k,plane in planes.items()}})
         cases.append({'id':cid,'sourceCaseId':cid,'sliceCount':depth,'dimensions':[512,512,depth],'spacing':[1,1,2],
-                      'tumorVolumeMl':gt*.002,'defaultSlice':2,'gt':stats['gt'],'models':{k:v for k,v in stats.items() if k!='gt'},
-                      'disagreement':None if cid=='case_045' else {'intersectionVoxels':0,'unionVoxels':sum(counts_by_case[cid]),'score':1},'slices':rows})
-    return {'version':'lits-model-compare-v1','localOnly':True,'caseCount':5,'windowHu':[-150,250],'cases':cases}
+                      'tumorVolumeMl':gt*.002,'defaultSlice':planes['gt'].index(max(planes['gt'])),'gt':stats['gt'],'models':{k:v for k,v in stats.items() if k!='gt'},
+                      'disagreement':None if cid=='case_045' else {'intersectionVoxels':0,'unionVoxels':sum(counts_by_case[cid]),'score':1 if sum(counts_by_case[cid]) else 0},'slices':rows})
+    return {'version':schema.VERSION,'localOnly':True,'caseCount':len(schema.CASES),'windowHu':[-150,250],'cases':cases}
 
 
-BASE = 'http://127.0.0.1:4173'
+BASE = os.environ.get('LESIONLENS_BASE_URL', 'http://127.0.0.1:4173')
 with sync_playwright() as p:
     options = {'headless':True}
     if os.environ.get('CHROME_EXECUTABLE'):
@@ -99,6 +115,11 @@ with sync_playwright() as p:
     page.locator('[data-case-id="case_000"]').wait_for()
     dialog=modal('case_000')
     dialog.locator('.md-demo-opt-in input').check()
+    def reveal_notes(dialog):
+        # 메모 입력란은 후속조치로 “기타(직접 입력)”를 고를 때만 나타난다.
+        dialog.get_by_label('기타(직접 입력)', exact=True).check()
+
+    reveal_notes(dialog)
     dialog.locator('textarea').fill('SYNTHETIC cancellation')
     dialog.get_by_role('button', name='전송 취소 및 닫기', exact=True).click()
     dialog.get_by_role('button', name='폐기하고 닫기', exact=True).click()
@@ -109,6 +130,7 @@ with sync_playwright() as p:
     dialog.get_by_label('CAPPY2 current', exact=True).check()
     dialog.get_by_label('CAPPY2 050', exact=True).check()
     expect(dialog.get_by_role('button', name='보내기 불가 · 수신 담당자 미연결')).to_be_disabled()
+    reveal_notes(dialog)
     dialog.locator('textarea').fill('SYNTHETIC selected-model memo')
     dialog.locator('.md-demo-opt-in input').check()
     submit=dialog.get_by_role('button', name='LOCAL DEMO 보내기', exact=True)
@@ -180,6 +202,7 @@ with sync_playwright() as p:
     dialog=modal('case_001')
     expect(dialog.get_by_label('모델 참고 없음', exact=True)).to_be_checked()
     dialog.locator('.md-demo-opt-in input').check()
+    reveal_notes(dialog)
     dialog.locator('textarea').fill('SYNTHETIC CT only memo')
     dialog.get_by_role('button', name='LOCAL DEMO 보내기', exact=True).click()
     page.get_by_role('link', name='보낸 사례 상세 보기', exact=True).click()

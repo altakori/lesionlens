@@ -1,27 +1,37 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const app = require('../app.js');
-function manifest() {
-  return {version: app.MANIFEST_VERSION, localOnly: true, caseCount: 5, windowHu: [-150,250],
-    cases: app.CASE_SPECS.map(([id,depth,voxels]) => {
-      const counts = {gt: voxels, ...Object.fromEntries(app.MODELS.slice(0,id === 'case_045' ? 0 : 3).map((k,j) => [k,app.MODEL_VOXELS[id][j]]))};
-      const stats = Object.fromEntries(Object.entries(counts).map(([kind,n]) => [kind, {voxels:n,volumeMl:n*.002,componentCount:1,componentVolumesMl:[n*.002],positiveSliceCount:1,sliceSpan:[3,3]}]));
-      return {id,sourceCaseId:id,sliceCount:depth,dimensions:[512,512,depth],spacing:[1,1,2],tumorVolumeMl:voxels*.002,defaultSlice:2,
+function manifest(specs = app.CASE_SPECS) {
+  return {version: app.MANIFEST_VERSION, localOnly: true, caseCount: specs.length, windowHu: [-150,250],
+    cases: specs.map(([id,depth,voxels]) => {
+      const counts = {gt: voxels, ...Object.fromEntries(app.caseArms(id).map((k,j) => [k,app.MODEL_VOXELS[id][j]]))};
+      const planes = {};
+      for (const [kind,n] of Object.entries(counts)) {
+        const a = new Array(depth).fill(0); let r = n, z = 2;
+        while (r > 0 && z < Math.min(depth, 14)) { const v = Math.min(r, 262144); a[z] = v; r -= v; z++; }
+        planes[kind] = a;
+      }
+      const hits = kind => planes[kind].flatMap((n,z) => n ? [z+1] : []);
+      const stats = Object.fromEntries(Object.entries(counts).map(([kind,n]) => { const p = hits(kind);
+        return [kind, {voxels:n,volumeMl:n*.002,componentCount:n?1:0,componentVolumesMl:n?[n*.002]:[],positiveSliceCount:p.length,sliceSpan:p.length?[p[0],p.at(-1)]:null}]; }));
+      return {id,sourceCaseId:id,sliceCount:depth,dimensions:[512,512,depth],spacing:[1,1,2],tumorVolumeMl:voxels*.002,defaultSlice:planes.gt.indexOf(Math.max(...planes.gt)),
         gt:stats.gt,models:Object.fromEntries(Object.entries(stats).filter(([k]) => k !== 'gt')),
-        disagreement:id === 'case_045' ? null : {intersectionVoxels:0,unionVoxels:app.MODEL_VOXELS[id].reduce((a,b) => a+b,0),score:1},
+        disagreement:id === 'case_045' ? null : {intersectionVoxels:0,unionVoxels:app.MODEL_VOXELS[id].reduce((a,b) => a+b,0),score:app.MODEL_VOXELS[id].reduce((a,b)=>a+b,0) ? 1 : 0},
         slices:Array.from({length:depth},(_,z) => {
           const base = `data/model_compare/web/${id}`, name = String(z+1).padStart(3,'0');
-          return {index:z+1,canonicalSlice:z,width:512,height:512,gtPixels:z === 2 ? voxels : 0,
+          return {index:z+1,canonicalSlice:z,width:512,height:512,gtPixels:planes.gt[z],
             ct:`${base}/ct/${name}.webp`,ctSha256:'a'.repeat(64),
             overlays:Object.fromEntries(Object.keys(counts).map(k => [k,{path:`${base}/${k}/${name}.png`,sha256:'b'.repeat(64)}])),
-            pixels:Object.fromEntries(Object.entries(counts).map(([k,n]) => [k,z === 2 ? n : 0]))};
+            pixels:Object.fromEntries(Object.keys(counts).map(k => [k,planes[k][z]]))};
         })};
     })};
 }
 test('exact matched cases retain full series, GT metadata and safe source ID only', () => {
   const raw = manifest();
   const cases = app.normalizeManifest(raw);
-  assert.deepEqual(cases.map(c => c.sliceCount), [75, 123, 124, 74, 244]);
+  // 27 matched-r3 cases (13 + 14) followed by 14 labv2 cases; depths come from the staged CT geometry.
+  assert.deepEqual(cases.map(c => c.sliceCount), [75, 123, 124, 74, 244, 537, 254, 227, 366, 244, 193, 147, 908, 549, 547, 574, 668, 513, 217, 871, 811, 696, 841, 677, 836, 401, 338,
+    113, 766, 846, 846, 836, 427, 461, 424, 463, 422, 432, 410, 987, 654]);
   assert.equal(cases[0].sourceCaseId, 'case_000');
   assert.equal(cases[0].privatePath, undefined);
   assert.equal(cases[1].slices.at(-1).ct, 'data/model_compare/web/case_001/ct/123.webp');
@@ -40,12 +50,19 @@ test('reject path attacks, swapped identity, geometry, incomplete slices and inv
 });
 test('search, measured volume sort, review filters and selection match case IDs', () => {
   const cases = app.normalizeManifest(manifest()), reviewed = new Set(['case_001']);
-  assert.deepEqual(app.filteredCases(cases, {sort: 'tumor'}).map(c => c.id), ['case_048','case_035','case_001','case_045','case_000']);
+  // 정렬 규칙: tumorVolumeMl 내림차순, 동률이면 CT ID 오름차순.
+  assert.deepEqual(app.filteredCases(cases, {sort: 'tumor'}).map(c => c.id),
+    ['case_129','lv2-case_117','case_116','lv2-case_118','case_093','lv2-case_128','case_088','lv2-case_123',
+     'case_051','case_080','case_113','lv2-case_122','case_026','case_102','case_048','case_009','case_035',
+     'case_019','case_060','case_079','case_049','case_001','case_057','lv2-case_120','case_126','case_045',
+     'case_061','case_000','case_095','lv2-case_121','case_065','case_020','lv2-case_125','case_005',
+     'lv2-case_127','case_083','lv2-case_041','lv2-case_089','lv2-case_114','lv2-case_115','lv2-case_119']);
   assert.equal(app.filteredCases(cases, {search: ' CASE_045 '})[0].id, 'case_045');
   assert.equal(app.filteredCases(cases, {search: 'missing'}).length, 0);
   assert.deepEqual(app.filteredCases(cases, {filter: 'reviewed', reviewed}).map(c => c.id), ['case_001']);
   const pending = app.filteredCases(cases, {filter: 'pending', reviewed});
-  assert.equal(app.visibleSelection(pending, 'case_001').id, 'case_048');
+  // 선택 사례가 검토 완료로 목록에서 빠지면 우선순위 1번 사례로 옮겨간다.
+  assert.equal(app.visibleSelection(pending, 'case_001').id, 'case_129');
   assert.equal(app.visibleSelection([], 'case_001'), null);
 });
 test('review persistence is keyed by version and ID and tolerates blocked storage', () => {
@@ -75,6 +92,24 @@ test('escaping, zero/horizontal wheel deltas, and finite slice bounds remain saf
   assert.deepEqual(app.wheelSlice(4, -12, 123), {slice: 3, changed: true});
   assert.equal(app.clampSlice(NaN, 75), 0);
   assert.equal(app.visibleSelection(app.normalizeManifest(manifest()), 'case_045').id, 'case_045');
+});
+
+test('lv2 cohort carries only the two trained arms and rejects an invented third model', () => {
+  assert.deepEqual(app.caseArms('lv2-case_041'), ['baseline', 'cappyv2']);
+  assert.deepEqual(app.caseArms('case_000'), ['baseline', 'cappyv2', 'cp050']);
+  assert.deepEqual(app.caseArms('case_045'), []);
+  const full = app.CASE_SPECS;
+  assert.equal(full.length, 41);
+  assert.equal(full.filter(([id]) => id.startsWith('lv2-')).length, 14);
+  // 10,570 slices for the labv2 fold-0 test cohort, measured from the staged CT geometry.
+  assert.equal(full.filter(([id]) => id.startsWith('lv2-')).reduce((s, c) => s + c[1], 0), 8087);
+  const cases = app.normalizeManifest(manifest(full));
+  assert.equal(cases.length, 41);
+  const lv2 = cases.find(c => c.id === 'lv2-case_041');
+  assert.deepEqual(Object.keys(lv2.models), ['baseline', 'cappyv2']);
+  const extra = manifest(full);
+  extra.cases.find(c => c.id === 'lv2-case_041').models.cp050 = JSON.parse(JSON.stringify(extra.cases.find(c => c.id === 'lv2-case_041').models.baseline));
+  assert.deepEqual(app.normalizeManifest(extra), []);
 });
 
 test('MD shell has a pending main queue, inline CT review, only a send dialog and versionless local assets', () => {
@@ -120,12 +155,24 @@ test('source-derived small/multiple and technical disagreement boundaries compos
   cases[1].gt.componentVolumesMl = [.999,5]; cases[1].gt.componentCount = 2;
   cases[0].disagreement.score = .20; cases[1].disagreement.score = .199;
   const ids = options => app.filteredCases(cases, {sort:'priority', ...options}).map(c => c.id);
-  assert.deepEqual(ids({category:'small'}), ['case_001']);
+  // GT 1 mL 미만(=500 voxels 미만)은 fixture에서도 여러 건이다: case_083(98), lv2-case_127, 여기에 수동으로 만든 case_001.
+  // 이 버킷이 얼마나 넓은지 자체가 보고 포인트다(선별 변별력이 약하다).
+  assert.deepEqual(ids({category:'small'}), ['case_083','lv2-case_127','case_001']);
   assert.deepEqual(ids({category:'multiple'}), ['case_001']);
-  assert.deepEqual(ids({category:'disagreement'}), ['case_035','case_048','case_000']);
+  // .20 경계: case_001(.199)만 제외, GT만 있는 case_045는 불일치 점수가 없다.
+  const disagreement = ids({category:'disagreement'});
+  // 합집합 0(모든 AI 표시 없음)은 점수가 0이므로 불일치 버킷에 들어가지 않는다.
+  const noUnion = app.CASE_SPECS.map(([id]) => id).filter(id => id !== 'case_045'
+    && app.MODEL_VOXELS[id].reduce((a, b) => a + b, 0) === 0);
+  assert.deepEqual([...disagreement].sort(), app.CASE_SPECS.map(c => c[0])
+    .filter(id => id !== 'case_045' && id !== 'case_001' && !noUnion.includes(id)).sort());
+  assert.equal(disagreement.at(-1), 'case_000');
   const first = new Set(['case_045','case_001']);
-  assert.deepEqual(ids({first}), ['case_001','case_045','case_035','case_048','case_000']);
-  assert.deepEqual(ids({sort:'disagreement',first}), ['case_001','case_045','case_035','case_048','case_000']);
+  // 고정(pin)된 두 건이 먼저 오고, 나머지는 고정 없는 순서와 같아야 한다.
+  for (const sort of [undefined, 'disagreement']) {
+    const base = ids(sort ? {sort} : {});
+    assert.deepEqual(ids(sort ? {sort,first} : {first}), ['case_001','case_045',...base.filter(id => !first.has(id))]);
+  }
   assert.deepEqual(ids({category:'priority',first,reviewed:new Set(['case_001']),filter:'pending',search:'045'}), ['case_045']);
   assert.deepEqual(cases.map(c => c.id), app.CASE_SPECS.map(c => c[0]));
 });

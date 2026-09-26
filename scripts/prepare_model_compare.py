@@ -17,7 +17,7 @@ try:
     from scripts.serve_local import safe_file
 except ModuleNotFoundError:
     import prepare_capp_cases as original
-    from compare_manifest import CASES, MODELS, VERSION, validate_manifest
+    from compare_manifest import CASES, MODELS, VERSION, arms_for, validate_manifest
     from serve_local import safe_file
 
 
@@ -119,9 +119,8 @@ def build(repo=Path('.'), verify_only=False, evidence=False):
         else:
             for kind in ('ct', 'gt'):
                 objects[kind] = load_source(root, entries[case_id, kind])
-        if case_id != 'case_045':
-            for kind in MODELS:
-                objects[kind] = load_source(root, entries[case_id, kind])
+        for kind in arms_for(case_id):
+            objects[kind] = load_source(root, entries[case_id, kind])
         arrays, spacing, voxel_ml = canonical_arrays(objects)
         if evidence:
             try:
@@ -146,7 +145,8 @@ def build(repo=Path('.'), verify_only=False, evidence=False):
                         raise ValueError(f'source binding mismatch: {case_id}/{kind}/{z + 1}')
                 else:
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(content)
+                    if not (path.is_file() and original.sha256(path) == digest):
+                        path.write_bytes(content)
                 if kind == 'ct':
                     row['ct'], row['ctSha256'] = relative, digest
                 else:
@@ -156,9 +156,9 @@ def build(repo=Path('.'), verify_only=False, evidence=False):
                       'dimensions': list(arrays['ct'].shape), 'spacing': spacing,
                       'tumorVolumeMl': stats['gt']['volumeMl'], 'defaultSlice': int(np.argmax(areas['gt'])),
                       'gt': stats['gt'], 'models': {kind: stats[kind] for kind in MODELS if kind in stats},
-                      'disagreement': disagreement([arrays[k] for k in MODELS]) if case_id != 'case_045' else None,
+                      'disagreement': disagreement([arrays[k] for k in arms_for(case_id)]) if arms_for(case_id) else None,
                       'slices': rows})
-    manifest = {'version': VERSION, 'localOnly': True, 'caseCount': 5, 'windowHu': [-150, 250], 'cases': cases}
+    manifest = {'version': VERSION, 'localOnly': True, 'caseCount': len(CASES), 'windowHu': [-150, 250], 'cases': cases}
     validate_manifest(manifest)
     target = safe_file(repo, 'data/model_compare/manifest.json', must_exist=verify_only)
     if verify_only:
@@ -166,7 +166,7 @@ def build(repo=Path('.'), verify_only=False, evidence=False):
             raise ValueError('manifest differs from approved source-derived metadata')
     else:
         pending = safe_file(repo, 'data/model_compare/manifest.pending', must_exist=False)
-        pending.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+        pending.write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         pending.replace(target)
     if evidence:
         try:
@@ -183,7 +183,7 @@ def build(repo=Path('.'), verify_only=False, evidence=False):
             out.write_text(json.dumps(artifact, indent=2), encoding='utf-8')
     # Return the in-memory recomputation, never the untrusted sidecar contents.
     # Runtime serving compares its captured artifact to this verified result.
-    print(json.dumps({'version': VERSION, 'cases': 5, 'slices': sum(c['sliceCount'] for c in cases), 'sourceBound': True}))
+    print(json.dumps({'version': VERSION, 'cases': len(CASES), 'slices': sum(c['sliceCount'] for c in cases), 'sourceBound': True}))
     return artifact if evidence else None
 
 

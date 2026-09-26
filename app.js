@@ -1,8 +1,73 @@
 'use strict';
-const MANIFEST_VERSION = 'lits-model-compare-v1';
-const CASE_SPECS = [['case_000',75,2591], ['case_001',123,7194], ['case_035',124,20318], ['case_045',74,4539], ['case_048',244,35478]];
+const MANIFEST_VERSION = 'lits-model-compare-v4';
+const CASE_SPECS = [['case_000',75,2591], ['case_001',123,7194], ['case_035',124,20318], ['case_045',74,4539], ['case_048',244,35478],
+  ['case_005',537,540], ['case_049',254,8015], ['case_051',227,124895], ['case_057',366,6604],
+  ['case_060',244,11368], ['case_061',193,2916], ['case_079',147,9085], ['case_116',908,611132],
+  ['case_009',549,22179],
+  ['case_019',547,18528],
+  ['case_020',574,1669],
+  ['case_026',668,51809],
+  ['case_065',513,1670],
+  ['case_080',217,88269],
+  ['case_083',871,98],
+  ['case_088',811,254141],
+  ['case_093',696,348088],
+  ['case_095',841,2581],
+  ['case_102',677,47754],
+  ['case_113',836,84270],
+  ['case_126',401,5090],
+  ['case_129',338,1909785],
+  // lv2-test20 cohort (ai0 labv2 Dataset003_Liver fold_0 test set, 2 arms)
+  ['lv2-case_041',113,0],
+  ['lv2-case_089',766,0],
+  ['lv2-case_114',846,0],
+  ['lv2-case_115',846,0],
+  ['lv2-case_117',836,1034092],
+  ['lv2-case_118',427,419119],
+  ['lv2-case_119',461,0],
+  ['lv2-case_120',424,5231],
+  ['lv2-case_121',463,2123],
+  ['lv2-case_122',422,79803],
+  ['lv2-case_123',432,228251],
+  ['lv2-case_125',410,754],
+  ['lv2-case_127',987,298],
+  ['lv2-case_128',654,326553],
+];
 const MODELS = ['baseline', 'cappyv2', 'cp050'];
-const MODEL_VOXELS = {case_000: [2359,2483,2517], case_001: [9499,9968,10472], case_035: [31587,8885,72907], case_048: [29641,30044,30495]};
+// lv2-* cases were produced by two trainers only; case_045 has no model output.
+const caseArms = id => id === 'case_045' ? [] : (id.startsWith('lv2-') ? MODELS.slice(0, 2) : MODELS);
+const MODEL_VOXELS = {case_000: [2359,2483,2517], case_001: [9499,9968,10472], case_035: [31587,8885,72907], case_048: [29641,30044,30495],
+  case_005: [915,482,564], case_049: [18175,20068,7080], case_051: [131139,134716,136408], case_057: [5978,6728,6793],
+  case_060: [8159,8076,8139], case_061: [2230,2487,2403], case_079: [8389,8294,8741], case_116: [0,0,17],
+  case_009: [22153,21981,23477],
+  case_019: [31898,31510,30673],
+  case_020: [8340,9892,14803],
+  case_026: [67718,67227,69658],
+  case_065: [673,754,841],
+  case_080: [71757,74493,73674],
+  case_083: [450,370,285],
+  case_088: [184392,200340,234853],
+  case_093: [383435,390345,396030],
+  case_095: [3766,3874,8076],
+  case_102: [32672,32427,34127],
+  case_113: [106704,104629,106500],
+  case_126: [3760,4224,5019],
+  case_129: [1799499,1805493,1780747],
+  'lv2-case_041': [29750,32791],
+  'lv2-case_089': [0,0],
+  'lv2-case_114': [2,0],
+  'lv2-case_115': [66,29],
+  'lv2-case_117': [1066536,1085419],
+  'lv2-case_118': [302721,323070],
+  'lv2-case_119': [0,0],
+  'lv2-case_120': [46966,8807],
+  'lv2-case_121': [153,980],
+  'lv2-case_122': [59705,69505],
+  'lv2-case_123': [235431,244728],
+  'lv2-case_125': [950,1042],
+  'lv2-case_127': [0,45],
+  'lv2-case_128': [409335,483678],
+};
 const SOURCE_LABELS = {gt: '정답 표시 (GT)', baseline: '기본 AI (nnU-Net)', cappyv2: 'CAPPYv2', cp050: 'CAPPYv2+ 실험 (CP050 epoch1000)', none: 'CT만 보기'};
 function normalizeManifest(raw) {
   try {
@@ -11,9 +76,10 @@ function normalizeManifest(raw) {
     const integer = (n, max = 512*512*244) => Number.isInteger(n) && n >= 0 && n <= max;
     const near = (a,b) => Number.isFinite(a) && Math.abs(a-b) <= Math.max(1e-12, Math.abs(b)*1e-6);
     keys(raw, ['version','localOnly','caseCount','windowHu','cases']);
-    check(raw.version === MANIFEST_VERSION && raw.localOnly === true && raw.caseCount === 5 && JSON.stringify(raw.windowHu) === '[-150,250]' && Array.isArray(raw.cases) && raw.cases.length === 5);
+    check(raw.version === MANIFEST_VERSION && raw.localOnly === true && raw.caseCount === CASE_SPECS.length
+      && JSON.stringify(raw.windowHu) === '[-150,250]' && Array.isArray(raw.cases) && raw.cases.length === CASE_SPECS.length);
     return raw.cases.map((item,i) => {
-      const [id,depth,voxels] = CASE_SPECS[i], models = id === 'case_045' ? [] : MODELS, kinds = ['gt',...models];
+      const [id,depth,voxels] = CASE_SPECS[i], models = caseArms(id), kinds = ['gt',...models];
       keys(item, ['id','sourceCaseId','sliceCount','dimensions','spacing','tumorVolumeMl','defaultSlice','gt','models','disagreement','slices']);
       check(item.id === id && item.sourceCaseId === id && item.sliceCount === depth && JSON.stringify(item.dimensions) === JSON.stringify([512,512,depth]));
       check(Array.isArray(item.spacing) && item.spacing.length === 3 && item.spacing.every(v => Number.isFinite(v) && v > 0 && v < 100));
@@ -207,7 +273,7 @@ function caseButtonHtml(item, selectedId, reviewed, first = false, rank = null, 
   const id = escapeHtml(item.id), priority = reviewPriority(item, first);
   const modelCount = MODELS.filter(kind => item.models?.[kind]).length;
   return `<article class="case-card${item.id === selectedId ? ' selected' : ''}" data-id="${id}" data-review-band="${priority.band}" data-reviewed="${!!reviewed}" data-rank-policy="pareto-gt-vol-count" data-review-group="${group ?? 'unknown'}" data-queue-ordinal="${rank ?? 'unknown'}">
-    <h3 class="case-id">${id}</h3><small class="case-subtitle">원본 사례 번호 · CT ${item.sliceCount}장</small>
+    <h3 class="case-id">${id}</h3><small class="case-subtitle">원본 사례 번호 · CT ${item.sliceCount}장${item.id.startsWith('lv2-') ? ' · 다른 실행군(labv2) · AI 2종' : ''}</small>
     ${morphologyPriorityHtml(item, rank, first, group)}
     ${sort === 'priority' ? `<p class="review-rank">기존 비교 기준 ${legacyRank === null ? '' : `${legacyRank}번째 · `}<span class="rank-band">${priority.label}</span></p>` : ''}
     <p class="emergency-status" title="응급 소견 판독·임상 정보가 연결되지 않았어요"><strong>응급 소견 미평가</strong></p>
@@ -451,7 +517,7 @@ function startApp() {
     renderList(); status('error', manifestError);
   });
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = {morphologyLayers, dominatesMorphology, morphologyPriority, compareMorphology, morphologyPriorityHtml, MANIFEST_VERSION, CASE_SPECS, normalizeManifest, reviewKey, readReviewed, setReviewed, filteredCases, visibleSelection, clampSlice, sliceValueText, wheelSlice, escapeHtml, caseButtonHtml, firstKey, readFirst, setFirst, MODELS, MODEL_VOXELS, SOURCE_LABELS, caseReason, comparisonHtml, reviewPriority, matchesCategory, selectNextCase, caseRecommendation, nextCaseHtml, queueSummaryHtml};
+if (typeof module !== 'undefined' && module.exports) module.exports = {morphologyLayers, dominatesMorphology, morphologyPriority, compareMorphology, morphologyPriorityHtml, MANIFEST_VERSION, CASE_SPECS, caseArms, normalizeManifest, reviewKey, readReviewed, setReviewed, filteredCases, visibleSelection, clampSlice, sliceValueText, wheelSlice, escapeHtml, caseButtonHtml, firstKey, readFirst, setFirst, MODELS, MODEL_VOXELS, SOURCE_LABELS, caseReason, comparisonHtml, reviewPriority, matchesCategory, selectNextCase, caseRecommendation, nextCaseHtml, queueSummaryHtml};
 if (typeof document !== 'undefined') {
   const url = new URL(window.location.href);
   if (url.searchParams.has('v')) {

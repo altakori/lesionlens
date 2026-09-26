@@ -86,7 +86,7 @@
       ...(['auto','basic'].includes(saved.viewpointChoice) ? {viewpointChoice:saved.viewpointChoice} : {}),
       ...(saved.viewpoint != null ? {viewpoint:clone(saved.viewpoint)} : {})};
   }
-  const compareVersion = 'lits-model-compare-v1';
+  const compareVersion = 'lits-model-compare-v4';
   const stable = value => JSON.stringify(value, function(key, v) {
     return v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v;
   });
@@ -269,9 +269,45 @@
     {alias:'case_035', manifestPath:seriesManifestPath, sourceCaseId:'case_035', imageSha256:'8e84fc0059e6622fa876def0e7d88b796b04935058004ddbebcb606f19fb9145'},
     {alias:'case_045', manifestPath:seriesManifestPath, sourceCaseId:'case_045', imageSha256:'1f63e67495bcf5520703500dcbe2cdcd4efc2885e974e5d6120fe6e22e157ff6'},
     {alias:'case_048', manifestPath:seriesManifestPath, sourceCaseId:'case_048', imageSha256:'3bd3a7473595b1b637defd4e0662a3ef88db1ba5ab864ee467343342cc380660'},
+    {alias:'case_005', manifestPath:seriesManifestPath, sourceCaseId:'case_005', imageSha256:'3cb4c1d0c86a1b2e64934ff9d9adfdc3bbc52d8fe528f1a8ea6c8d280ed633ca'},
+    {alias:'case_049', manifestPath:seriesManifestPath, sourceCaseId:'case_049', imageSha256:'6813f248c36068ff5f5bdbc1cd1788daf27d944c676ff8985c3d50c4a0950b1f'},
+    {alias:'case_051', manifestPath:seriesManifestPath, sourceCaseId:'case_051', imageSha256:'e633b7e5626ec58623cfa6e47513b79d620e9e2cd62631321129ae67d005b7f0'},
+    {alias:'case_057', manifestPath:seriesManifestPath, sourceCaseId:'case_057', imageSha256:'8af59636966b87a0f4bd8d04d00e11f4536701a57b6c869cb1679220dd76f04e'},
+    {alias:'case_060', manifestPath:seriesManifestPath, sourceCaseId:'case_060', imageSha256:'4a091eac81c93d1c5ceb9614b4d5830726b5b95aedd74136f8fd296c4b45bce3'},
+    {alias:'case_061', manifestPath:seriesManifestPath, sourceCaseId:'case_061', imageSha256:'abd4e122db0e48c8b15a50835d23fac6f13e6fa55178671bacd0e67c4c084be8'},
+    {alias:'case_079', manifestPath:seriesManifestPath, sourceCaseId:'case_079', imageSha256:'649d34ad4a89ec8c2ce10cce8e7483cdb6e5ba089c1ea274b5feebfc1fa694b7'},
+    {alias:'case_116', manifestPath:seriesManifestPath, sourceCaseId:'case_116', imageSha256:'626c8b1acc2783c9201715d769f1331f426e5b76b51b83b5ea3bce9cabd6795a'},
+    {alias:'case_009', manifestPath:seriesManifestPath, sourceCaseId:'case_009', imageSha256:'0547d119a866c2ed60a7f643ea66489daecc0e09756098399e6b3ecd267c5783'},
+    {alias:'case_019', manifestPath:seriesManifestPath, sourceCaseId:'case_019', imageSha256:'21c74f43dc5e3cb324b85608839d25ce93d94c23b353cd4143410638631c45a2'},
+    {alias:'case_020', manifestPath:seriesManifestPath, sourceCaseId:'case_020', imageSha256:'edb120fee1b427f8a9660ea4231f3dfd4b469f9d8eaf6b7d07616affaae42875'},
+    {alias:'case_026', manifestPath:seriesManifestPath, sourceCaseId:'case_026', imageSha256:'b7fab64837701eff3c5fd5711d02f71f9a2646daf466de0ff51c7744fec0efb9'},
+    {alias:'case_065', manifestPath:seriesManifestPath, sourceCaseId:'case_065', imageSha256:'6b3756f77a3075e2c45f549b924f46be4a507c1d8c0ac2e347bbf35c3d543bfa'},
+    {alias:'case_080', manifestPath:seriesManifestPath, sourceCaseId:'case_080', imageSha256:'19e5a977de0a62f8f1f60802d554fb1d2e3baf77969394671ef594cb27d13a2c'},
+    {alias:'case_083', manifestPath:seriesManifestPath, sourceCaseId:'case_083', imageSha256:'e0fdcea24bed84286ebc79ab4fbfc95bae65d8011aac5f9101a7ec13a01d0bb9'},
+    {alias:'case_088', manifestPath:seriesManifestPath, sourceCaseId:'case_088', imageSha256:'b9ab81dafa69431dec346aa07080e68a2ce51b79e09557dac3a6d464e48ee53a'},
+    {alias:'case_093', manifestPath:seriesManifestPath, sourceCaseId:'case_093', imageSha256:'016c1743586164f52822863e15188bcc72a1a2839fb62e3b88b6dbd048021f7e'},
+    {alias:'case_095', manifestPath:seriesManifestPath, sourceCaseId:'case_095', imageSha256:'99c7c28676a5376422003a9340f4f6645a772b5eb5189525035b1e1e11354cf7'},
+    {alias:'case_102', manifestPath:seriesManifestPath, sourceCaseId:'case_102', imageSha256:'d5f2746d32c6b85bf5348a4f68ff452c580892b8d38b454f473d501e15f83a83'},
+    {alias:'case_113', manifestPath:seriesManifestPath, sourceCaseId:'case_113', imageSha256:'ac40b396f205ac1728fd5cfe3ff8d8b2591d7934064dd7feae037ec2bd31c251'},
+    {alias:'case_126', manifestPath:seriesManifestPath, sourceCaseId:'case_126', imageSha256:'2d5f0c8dfcf6dc5f80031d34622688ee18e90437bdf0fcc9b81c12609eda1e37'},
+    {alias:'case_129', manifestPath:seriesManifestPath, sourceCaseId:'case_129', imageSha256:'cf0947b317635fec5de8abc19cb3b169a7cf4efc85a09da59437584fbff330cf'},
     {alias:'LL-CT-001', manifestPath:realCasesManifestPath, sourceCaseId:'000', imageSha256:'5b41a5c4065094a3a8af45c01d49852d6ae5a215cc7807c318aef2744eb125f1'},
     {alias:'LL-CT-002', manifestPath:realCasesManifestPath, sourceCaseId:'131', imageSha256:'3009c1e9b72345dca96fd6bbf169416e53f6d699747784812b1f31e212572b1c'},
-    {alias:'LL-CT-003', manifestPath:realCasesManifestPath, sourceCaseId:'045', imageSha256:'1f63e67495bcf5520703500dcbe2cdcd4efc2885e974e5d6120fe6e22e157ff6'}
+    {alias:'LL-CT-003', manifestPath:realCasesManifestPath, sourceCaseId:'045', imageSha256:'1f63e67495bcf5520703500dcbe2cdcd4efc2885e974e5d6120fe6e22e157ff6'},
+    {alias:'lv2-case_041', manifestPath:seriesManifestPath, sourceCaseId:'case_041', imageSha256:'bf00c6addfa72c156745426656890d2bba09afb3ffb985656f35a2a0e4ecaaa6'},
+    {alias:'lv2-case_089', manifestPath:seriesManifestPath, sourceCaseId:'case_089', imageSha256:'b426f14b6afa7c43d2c1469a8ee1ece18b1392999032512f6525056aa71070e6'},
+    {alias:'lv2-case_114', manifestPath:seriesManifestPath, sourceCaseId:'case_114', imageSha256:'85eb7a558c14f4675c87289d215c7d4d17e652890191f721631750156b7fe934'},
+    {alias:'lv2-case_115', manifestPath:seriesManifestPath, sourceCaseId:'case_115', imageSha256:'4c0558079b09f0a58b2737386e15f513c7ae4bd45fc702927d0cead5848c4598'},
+    {alias:'lv2-case_117', manifestPath:seriesManifestPath, sourceCaseId:'case_117', imageSha256:'26faffeb4a3137274ed7d8f5da070187d3924baf50c724b8f234135a7716ae75'},
+    {alias:'lv2-case_118', manifestPath:seriesManifestPath, sourceCaseId:'case_118', imageSha256:'9e74a55f74b99c019617f422e14457ea580a357d797dada9ebfda6174d400667'},
+    {alias:'lv2-case_119', manifestPath:seriesManifestPath, sourceCaseId:'case_119', imageSha256:'6dd7ba782a0f44e5188044130502605efe4bb16feb77c406e691f67354450190'},
+    {alias:'lv2-case_120', manifestPath:seriesManifestPath, sourceCaseId:'case_120', imageSha256:'781a72a76260739a19a8757780eaaa7c2167912ecad177dd30c7e9588d43d59d'},
+    {alias:'lv2-case_121', manifestPath:seriesManifestPath, sourceCaseId:'case_121', imageSha256:'74b51d05677574d3b8d47b6976770239229fb812e3f239946204546903eb5538'},
+    {alias:'lv2-case_122', manifestPath:seriesManifestPath, sourceCaseId:'case_122', imageSha256:'a670acd38ef482ff75bf8b7865600c49365a1f9f7c8250be70eedbce97b00b2e'},
+    {alias:'lv2-case_123', manifestPath:seriesManifestPath, sourceCaseId:'case_123', imageSha256:'ac6b3e581ddb45030dfcc580a6a62595a15e31eb5e86c7c55ed2ddbcc2273351'},
+    {alias:'lv2-case_125', manifestPath:seriesManifestPath, sourceCaseId:'case_125', imageSha256:'843c0c42803744f1b137b7559e3277eb3367b08ca8077fb251a3251ddae4b3bb'},
+    {alias:'lv2-case_127', manifestPath:seriesManifestPath, sourceCaseId:'case_127', imageSha256:'3d7ab58705fc6953e33279b9db617d79777efe5389d03e5488582e136d16502a'},
+    {alias:'lv2-case_128', manifestPath:seriesManifestPath, sourceCaseId:'case_128', imageSha256:'a117940eef416785f072ca72fa2c8c8f5d06b28562cc12bfb941b51d7eb223fb'},
   ];
   // Dataset003_Liver(=LiTS)는 환자당 CT 1건에 환자 키를 주지 않으므로, 로컬 자산에는 같은
   // 환자의 이전·다음 검사가 없다. ai0에 실제 다중 검사 자료(3D-IRCADb-01, 환자당 동맥·정맥

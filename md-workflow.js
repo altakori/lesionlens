@@ -96,7 +96,10 @@
   }
   function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();const items=M.queue(cases,evidence,state,filter.value,search.value);
     for(const c of items){const e=evidence[c.id], card=el('article',null,'md-case-card');card.dataset.caseId=c.id;
-      card.append(el('h2',c.id),el('strong',c.synthetic?'DEMO ONLY · 합성 워크플로 시연 · 실제 CT/환자 없음':M.reason(e),'md-core-reason'));
+      // 코호트마다 예측 arm 수가 다르므로, 비교에 실제로 쓰인 모델 수를 카드의 보이는 줄에 남긴다.
+      const arms=M.models.filter(k=>(e&&e.models&&e.models[k])||(c.models&&c.models[k]));
+      const armNote=arms.length&&arms.length<M.models.length?` · AI 비교 ${arms.length}/${M.models.length}종`:'';
+      card.append(el('h2',c.id),el('strong',c.synthetic?'DEMO ONLY · 합성 워크플로 시연 · 실제 CT/환자 없음':M.reason(e)+armNote,'md-core-reason'));
       const chips=el('div',null,'md-reason-chips md-tags');
       if(e?.reasons.length)chips.append(el('span','모델 간 불일치','md-reason-chip md-tag'));
       if(e?.reasons.some(r=>r.smallAdditional))chips.append(el('span','작은 추가 후보','md-reason-chip md-tag'));
