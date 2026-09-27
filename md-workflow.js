@@ -55,7 +55,7 @@
     const others=series.studies.filter(k=>k.relation!=='current').length;
     const toggle=el('button');toggle.type='button';toggle.className='md-series-toggle';
     toggle.setAttribute('aria-expanded','false');
-    toggle.append(el('span','검사 시리즈 · '+series.studies.length+'건 · 이전·다음 '+(others?others+'건':'없음'),'md-series-toggle-label'),el('span','▾','md-series-caret'));
+    toggle.append(el('span',(series.syntheticSeries?'합성 ':'')+'검사 시리즈 · '+series.studies.length+'건 · 이전·다음 '+(others?others+'건':'없음'),'md-series-toggle-label'),el('span','▾','md-series-caret'));
     const body=el('div',null,'md-series-body');body.hidden=true;
     const bar=el('div',null,'md-series');
     const title=el('p',M.seriesSummary(c),'md-series-title');
@@ -335,8 +335,8 @@
     context.append(viewpointGroup,visitBox);
     const seriesInfo=M.seriesFor(c);
     const seriesOthers=seriesInfo?seriesInfo.studies.filter(s=>s.relation!=='current').length:0;
-    if(seriesOthers)context.append(el('p',`이 환자 검사 시리즈: ${M.seriesSummary(c)} · ${seriesInfo.basis} · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
-    else if(seriesInfo&&seriesInfo.duplicates&&seriesInfo.duplicates.length)context.append(el('p',`같은 검사가 이 창에 다시 표시되지 않습니다. 복제 표시: ${seriesInfo.duplicates.map(d=>d.alias+' · '+d.reason).join(', ')} · 이 창에서는 표시만 하고 전송 기록에는 넣지 않습니다.`,'md-context-series'));
+    if(seriesOthers)context.append(el('p',`이 환자 검사 시리즈: ${M.seriesSummary(c)} · ${seriesInfo.basis} · 이 창에서 표시하고 전송 기록에도 같은 검사 시리즈 스냅샷으로 남깁니다.`,'md-context-series'));
+    else if(seriesInfo&&seriesInfo.duplicates&&seriesInfo.duplicates.length)context.append(el('p',`같은 검사가 이 창에 다시 표시되지 않습니다. 복제 표시: ${seriesInfo.duplicates.map(d=>d.alias+' · '+d.reason).join(', ')} · 이 창에서 표시하고 전송 기록에도 같은 검사 시리즈 스냅샷으로 남깁니다.`,'md-context-series'));
     const actionLayer=el('section',null,'md-layer md-layer-action');
     actionLayer.append(error,send,cancel);
     dialog.append(decision,context,actionLayer);

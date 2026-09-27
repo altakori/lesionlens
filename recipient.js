@@ -146,10 +146,12 @@
     // named once as text instead of being mounted as another exam.
     if(r.series&&Array.isArray(r.series.studies)&&r.series.studies.length){
       const series=el('section','','md-record-series');
-      series.append(el('h3','검사 시리즈 · '+(r.series.patientId||'이 데이터셋은 환자당 CT 1건 · 환자 키 없음')));
+      series.append(el('h3','검사 시리즈 · '+(r.series.patientId||'이 데이터셋은 환자당 CT 1건 · 환자 키 없음')+(r.series.syntheticSeries?' · '+r.series.studies.length+'건 합성 구성 · 실제 환자 경과 아님':'')));
       const seriesChips=el('div','','md-record-series-chips');
       const seriesStatus=el('p','','md-record-series-status');seriesStatus.setAttribute('role','status');
-      seriesStatus.textContent='검사 식별은 image sha256 receipt 기준입니다. 같은 환자의 다른 검사는 이 데이터셋에 없습니다. 환자 이력·경과 판단에 쓰지 마세요.';
+      seriesStatus.textContent=r.series.syntheticSeries
+        ? '이 시리즈는 시연용 합성 구성입니다. 짝 지은 두 검사는 서로 다른 환자이며 실제 경과가 아닙니다. 환자 이력·경과 판단에 쓰지 마세요.'
+        : '검사 식별은 image sha256 receipt 기준입니다. 같은 환자의 다른 검사는 이 데이터셋에 없습니다. 환자 이력·경과 판단에 쓰지 마세요.';
       const seriesHost=el('div','','md-record-series-viewer');seriesHost.hidden=true;
       async function openSeriesStudy(study,chip){
         if(seriesView){seriesView.close();seriesView=null;}

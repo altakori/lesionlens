@@ -313,6 +313,29 @@
   // 환자의 이전·다음 검사가 없다. ai0에 실제 다중 검사 자료(3D-IRCADb-01, 환자당 동맥·정맥
   // 2검사 20명)가 있지만 external_data_quarantine에 격리되어 있고 CC BY-NC-ND 재배포 금지에
   // DICOM PatientName·PatientBirthDate가 채워진 상태라, 비식별·사용조건 결정 전에는 쓰지 않는다.
+  // 합성 검사 시리즈(DEMO) · 실제 짝이 아니라 화면 구성을 위한 결합이다.
+  // Dataset003_Liver에는 환자당 검사 1건만 있으므로(위 주석) 실제 이전·다음 검사 근거가 없다.
+  // 그래서 GT(class 2 병변) 부피가 작은 검사를 '이전', 큰 검사를 '현재'로 삼았다. 두 검사는
+  // 서로 다른 환자이고, GT 부피 실측값은 work/gt_geom_local.json(2026-09-27), 결정 근거는
+  // docs/study-series-dedupe.md에 남겼다. 표시 간격은 짝 테이블에 박힌 고정값이라 새로고침해도
+  // 바뀌지 않는다. gtBasis 단위는 cm3(=mL)로, GT class 2 복셀 수 x 복셀 부피로 계산한 값이다
+  // (예 case_065: 1,670복셀 x 0.625^2 x 0.8mm = 0.52cm3). 382.5L가 아니라 382.5cm3가 맞다.
+  const syntheticSeriesGroups = [
+    {patientId:'DEMO-SERIES-1', prior:'case_065', current:'lv2-case_117', intervalMonths:7, gtBasis:'GT 병변 0.5cm³ → 382.5cm³'},
+    {patientId:'DEMO-SERIES-2', prior:'lv2-case_125', current:'case_129', intervalMonths:14, gtBasis:'GT 병변 0.6cm³ → 664.6cm³'},
+    {patientId:'DEMO-SERIES-3', prior:'case_083', current:'lv2-case_118', intervalMonths:5, gtBasis:'GT 병변 0.04cm³ → 348.1cm³'},
+  ];
+  const syntheticSeriesLabel = '합성 구성 · 실제 환자의 경과 아님';
+  function syntheticSeriesFor(alias) {
+    const hit = syntheticSeriesGroups.find(g => g.prior === alias || g.current === alias);
+    if (!hit) return null;
+    const asPrior = hit.current === alias;
+    const other = asPrior ? hit.prior : hit.current;
+    const receipt = studyReceipt(other);
+    return {patientId:hit.patientId, relation:asPrior ? 'prior' : 'next', other,
+      assumedDate:`현재보다 약 ${hit.intervalMonths}개월 ${asPrior ? '전' : '후'}`, gtBasis:hit.gtBasis,
+      viewable:!!receipt && receipt.manifestPath === seriesManifestPath};
+  }
   function studyReceipt(alias) { return studyReceipts.find(r => r.alias === alias) || null; }
   function duplicateStudies(c) {
     const r = studyReceipt(c && c.id);
@@ -328,17 +351,27 @@
   function seriesFor(c) {
     if (!c || c.synthetic || typeof c.id !== 'string' || !c.id) return null;
     const r = studyReceipt(c.id);
-    return {kind:'study-series-v2', patientId:null,
-      patientIdBasis:'Dataset003_Liver는 환자당 CT 1건 · 환자 키 없음',
-      basis:'검사 식별은 image sha256 receipt 기준 · 같은 환자의 다른 검사는 이 데이터셋에 없음',
-      currentIndex:0,
-      studies:[{alias:c.id, relation:'current', label:seriesRelations.current,
-        viewable:!r || r.manifestPath === seriesManifestPath}],
-      duplicates:duplicateStudies(c)};
+    const syn = syntheticSeriesFor(c.id);
+    const current = {alias:c.id, relation:'current', label:seriesRelations.current,
+      viewable:!r || r.manifestPath === seriesManifestPath};
+    const other = syn ? {alias:syn.other, relation:syn.relation, label:seriesRelations[syn.relation],
+      assumedDate:syn.assumedDate, viewable:syn.viewable} : null;
+    const studies = !syn ? [current] : syn.relation === 'prior' ? [other, current] : [current, other];
+    return {kind:'study-series-v2', patientId:syn ? syn.patientId : null,
+      patientIdBasis:syn ? '합성 구성 · 실제 환자 키 아님' : 'Dataset003_Liver는 환자당 CT 1건 · 환자 키 없음',
+      syntheticSeries:!!syn, gtBasis:syn ? syn.gtBasis : null,
+      basis:syn ? `${syntheticSeriesLabel} · GT 병변 부피 순으로 서로 다른 검사를 짝지음(${syn.gtBasis})`
+        : '검사 식별은 image sha256 receipt 기준 · 같은 환자의 다른 검사는 이 데이터셋에 없음',
+      currentIndex:studies.findIndex(s => s.relation === 'current'),
+      studies, duplicates:duplicateStudies(c)};
   }
   function seriesSummary(c) {
     const s = seriesFor(c);
     if (!s) return '';
+    if (s.syntheticSeries) {
+      const other = s.studies.find(k => k.relation !== 'current');
+      return `합성 시리즈 ${s.studies.length}건 · ${other.label} 1건 · 실제 환자의 경과 아님`;
+    }
     return s.duplicates.length
       ? `이 검사 1건 · 같은 검사의 복제 표시 ${s.duplicates.map(d => d.alias).join(', ')}`
       : '이 검사 1건 · 이전·다음 검사 미확인';
@@ -378,7 +411,7 @@
     return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
   }
   const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,reviewCandidates,candidateLabel,biopsyCandidateLabel,
-    visitOptions,visitLabels,visitLabel,visitStatus,studyReceipts,duplicateStudies,studyIdentityKey,priorStudyFor,
+    visitOptions,visitLabels,visitLabel,visitStatus,studyReceipts,syntheticSeriesGroups,duplicateStudies,studyIdentityKey,priorStudyFor,
     biopsyProtocolOptions,biopsyProtocolLabels,biopsyProtocolLabel,protocolGuide,seriesFor,seriesSummary,seriesRelations,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);
