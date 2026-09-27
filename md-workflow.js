@@ -177,7 +177,9 @@
       for(const sent of Object.values(state.sends).filter(r=>r.case.id===c.id)){
         const link=el('a','보낸 기록 상세 · '+sent.time,'md-sent-record-link');link.href=M.recordLink(scope,sent.id);card.append(link);
       }
-      card.append(viewer,seriesBox,decisions);list.append(card);
+      // seriesBox가 null인 검사는 append에 넘기지 않는다. ParentNode.append는 null을
+      // 텍스트 'null'로 바꿔 카드마다 안 보이는 글자 하나를 남긴다.
+      card.append(viewer);if(seriesBox)card.append(seriesBox);card.append(decisions);list.append(card);
     }
     if(!items.length)list.append(el('p','조건에 맞는 사례 없음 · 전체 필터에서 다시 검토할 수 있습니다.'));
   }
