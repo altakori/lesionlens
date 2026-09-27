@@ -1,0 +1,937 @@
+{
+  "run": "review_load_metric",
+  "input": {
+    "evidence": "evidence.json",
+    "sha256": "89828f652a3edf0dbde73a90dc1cf67a268ac46cc9c185e3b9742c09eac755c2"
+  },
+  "rules": {
+    "connectivity": 26,
+    "match": "intersection/min(component voxels) >= 0.1",
+    "overlapThreshold": 0.1,
+    "smallMl": 1.0,
+    "smallAdditionalRequires": "larger component in same model",
+    "clinicalValidation": false
+  },
+  "rows": [
+    {
+      "case_id": "case_000",
+      "models": {
+        "baseline": 9,
+        "cappyv2": 9,
+        "cp050": 10
+      },
+      "candidate_total_raw": 28,
+      "match_edges": 27,
+      "unique_candidates_after_dedup": 10,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:3"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_001",
+      "models": {
+        "baseline": 13,
+        "cappyv2": 13,
+        "cp050": 13
+      },
+      "candidate_total_raw": 39,
+      "match_edges": 39,
+      "unique_candidates_after_dedup": 13,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:5"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_005",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 1,
+        "cp050": 1
+      },
+      "candidate_total_raw": 4,
+      "match_edges": 3,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "baseline:2"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_009",
+      "models": {
+        "baseline": 7,
+        "cappyv2": 6,
+        "cp050": 7
+      },
+      "candidate_total_raw": 20,
+      "match_edges": 19,
+      "unique_candidates_after_dedup": 7,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_019",
+      "models": {
+        "baseline": 3,
+        "cappyv2": 2,
+        "cp050": 3
+      },
+      "candidate_total_raw": 8,
+      "match_edges": 7,
+      "unique_candidates_after_dedup": 3,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_020",
+      "models": {
+        "baseline": 5,
+        "cappyv2": 5,
+        "cp050": 7
+      },
+      "candidate_total_raw": 17,
+      "match_edges": 13,
+      "unique_candidates_after_dedup": 8,
+      "additional_candidates_unmatched": 4,
+      "additional_candidates_unmatched_small": 4,
+      "unmatched_candidate_ids": [
+        "baseline:4",
+        "cp050:3",
+        "cp050:4",
+        "cp050:6"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_026",
+      "models": {
+        "baseline": 5,
+        "cappyv2": 6,
+        "cp050": 6
+      },
+      "candidate_total_raw": 17,
+      "match_edges": 16,
+      "unique_candidates_after_dedup": 6,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_035",
+      "models": {
+        "baseline": 7,
+        "cappyv2": 11,
+        "cp050": 16
+      },
+      "candidate_total_raw": 34,
+      "match_edges": 21,
+      "unique_candidates_after_dedup": 17,
+      "additional_candidates_unmatched": 10,
+      "additional_candidates_unmatched_small": 6,
+      "unmatched_candidate_ids": [
+        "baseline:4",
+        "cappyv2:11",
+        "cp050:12",
+        "cp050:13",
+        "cp050:14",
+        "cp050:3",
+        "cp050:4",
+        "cp050:5",
+        "cp050:6",
+        "cp050:8"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_048",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 2,
+        "cp050": 3
+      },
+      "candidate_total_raw": 7,
+      "match_edges": 6,
+      "unique_candidates_after_dedup": 3,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:3"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_049",
+      "models": {
+        "baseline": 22,
+        "cappyv2": 28,
+        "cp050": 24
+      },
+      "candidate_total_raw": 74,
+      "match_edges": 64,
+      "unique_candidates_after_dedup": 29,
+      "additional_candidates_unmatched": 3,
+      "additional_candidates_unmatched_small": 2,
+      "unmatched_candidate_ids": [
+        "cappyv2:2",
+        "cappyv2:3",
+        "cp050:24"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_051",
+      "models": {
+        "baseline": 8,
+        "cappyv2": 11,
+        "cp050": 8
+      },
+      "candidate_total_raw": 27,
+      "match_edges": 26,
+      "unique_candidates_after_dedup": 10,
+      "additional_candidates_unmatched": 2,
+      "additional_candidates_unmatched_small": 2,
+      "unmatched_candidate_ids": [
+        "cappyv2:3",
+        "cappyv2:8"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_057",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 3,
+        "cp050": 4
+      },
+      "candidate_total_raw": 9,
+      "match_edges": 7,
+      "unique_candidates_after_dedup": 4,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:4"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_060",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 2,
+        "cp050": 2
+      },
+      "candidate_total_raw": 5,
+      "match_edges": 4,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_061",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 2,
+        "cp050": 3
+      },
+      "candidate_total_raw": 7,
+      "match_edges": 6,
+      "unique_candidates_after_dedup": 3,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:1"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_065",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 1,
+        "cp050": 1
+      },
+      "candidate_total_raw": 3,
+      "match_edges": 3,
+      "unique_candidates_after_dedup": 1,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_079",
+      "models": {
+        "baseline": 10,
+        "cappyv2": 10,
+        "cp050": 9
+      },
+      "candidate_total_raw": 29,
+      "match_edges": 28,
+      "unique_candidates_after_dedup": 10,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_080",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 2,
+        "cp050": 2
+      },
+      "candidate_total_raw": 6,
+      "match_edges": 6,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_083",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 2,
+        "cp050": 2
+      },
+      "candidate_total_raw": 6,
+      "match_edges": 6,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_088",
+      "models": {
+        "baseline": 4,
+        "cappyv2": 9,
+        "cp050": 8
+      },
+      "candidate_total_raw": 21,
+      "match_edges": 15,
+      "unique_candidates_after_dedup": 11,
+      "additional_candidates_unmatched": 6,
+      "additional_candidates_unmatched_small": 6,
+      "unmatched_candidate_ids": [
+        "cappyv2:1",
+        "cappyv2:6",
+        "cappyv2:8",
+        "cp050:4",
+        "cp050:5",
+        "cp050:7"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_093",
+      "models": {
+        "baseline": 29,
+        "cappyv2": 30,
+        "cp050": 30
+      },
+      "candidate_total_raw": 89,
+      "match_edges": 80,
+      "unique_candidates_after_dedup": 35,
+      "additional_candidates_unmatched": 7,
+      "additional_candidates_unmatched_small": 7,
+      "unmatched_candidate_ids": [
+        "baseline:1",
+        "baseline:17",
+        "cappyv2:1",
+        "cappyv2:21",
+        "cappyv2:22",
+        "cp050:26",
+        "cp050:5"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_095",
+      "models": {
+        "baseline": 4,
+        "cappyv2": 8,
+        "cp050": 8
+      },
+      "candidate_total_raw": 20,
+      "match_edges": 12,
+      "unique_candidates_after_dedup": 12,
+      "additional_candidates_unmatched": 8,
+      "additional_candidates_unmatched_small": 8,
+      "unmatched_candidate_ids": [
+        "cappyv2:1",
+        "cappyv2:4",
+        "cappyv2:6",
+        "cappyv2:8",
+        "cp050:3",
+        "cp050:5",
+        "cp050:6",
+        "cp050:7"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_102",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 1,
+        "cp050": 1
+      },
+      "candidate_total_raw": 3,
+      "match_edges": 3,
+      "unique_candidates_after_dedup": 1,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_113",
+      "models": {
+        "baseline": 14,
+        "cappyv2": 15,
+        "cp050": 12
+      },
+      "candidate_total_raw": 41,
+      "match_edges": 38,
+      "unique_candidates_after_dedup": 15,
+      "additional_candidates_unmatched": 2,
+      "additional_candidates_unmatched_small": 2,
+      "unmatched_candidate_ids": [
+        "baseline:2",
+        "cappyv2:10"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_116",
+      "models": {
+        "baseline": 0,
+        "cappyv2": 0,
+        "cp050": 2
+      },
+      "candidate_total_raw": 2,
+      "match_edges": 0,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 2,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cp050:1",
+        "cp050:2"
+      ],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_126",
+      "models": {
+        "baseline": 2,
+        "cappyv2": 2,
+        "cp050": 2
+      },
+      "candidate_total_raw": 6,
+      "match_edges": 6,
+      "unique_candidates_after_dedup": 2,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "case_129",
+      "models": {
+        "baseline": 12,
+        "cappyv2": 13,
+        "cp050": 12
+      },
+      "candidate_total_raw": 37,
+      "match_edges": 37,
+      "unique_candidates_after_dedup": 12,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": []
+    },
+    {
+      "case_id": "lv2-case_041",
+      "models": {
+        "baseline": 4,
+        "cappyv2": 5
+      },
+      "candidate_total_raw": 9,
+      "match_edges": 4,
+      "unique_candidates_after_dedup": 5,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cappyv2:5"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_114",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 0
+      },
+      "candidate_total_raw": 1,
+      "match_edges": 0,
+      "unique_candidates_after_dedup": 1,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [
+        "baseline:1"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_115",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 3
+      },
+      "candidate_total_raw": 4,
+      "match_edges": 1,
+      "unique_candidates_after_dedup": 3,
+      "additional_candidates_unmatched": 2,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "cappyv2:1",
+        "cappyv2:2"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_117",
+      "models": {
+        "baseline": 52,
+        "cappyv2": 53
+      },
+      "candidate_total_raw": 105,
+      "match_edges": 50,
+      "unique_candidates_after_dedup": 55,
+      "additional_candidates_unmatched": 10,
+      "additional_candidates_unmatched_small": 10,
+      "unmatched_candidate_ids": [
+        "baseline:11",
+        "baseline:24",
+        "baseline:36",
+        "baseline:38",
+        "baseline:40",
+        "baseline:6",
+        "cappyv2:12",
+        "cappyv2:23",
+        "cappyv2:40",
+        "cappyv2:42"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_118",
+      "models": {
+        "baseline": 10,
+        "cappyv2": 9
+      },
+      "candidate_total_raw": 19,
+      "match_edges": 9,
+      "unique_candidates_after_dedup": 10,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "baseline:5"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_120",
+      "models": {
+        "baseline": 5,
+        "cappyv2": 4
+      },
+      "candidate_total_raw": 9,
+      "match_edges": 4,
+      "unique_candidates_after_dedup": 5,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [
+        "baseline:4"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_121",
+      "models": {
+        "baseline": 3,
+        "cappyv2": 4
+      },
+      "candidate_total_raw": 7,
+      "match_edges": 2,
+      "unique_candidates_after_dedup": 5,
+      "additional_candidates_unmatched": 3,
+      "additional_candidates_unmatched_small": 2,
+      "unmatched_candidate_ids": [
+        "baseline:2",
+        "cappyv2:2",
+        "cappyv2:4"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_122",
+      "models": {
+        "baseline": 10,
+        "cappyv2": 9
+      },
+      "candidate_total_raw": 19,
+      "match_edges": 8,
+      "unique_candidates_after_dedup": 11,
+      "additional_candidates_unmatched": 3,
+      "additional_candidates_unmatched_small": 3,
+      "unmatched_candidate_ids": [
+        "baseline:2",
+        "baseline:4",
+        "cappyv2:2"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_123",
+      "models": {
+        "baseline": 9,
+        "cappyv2": 9
+      },
+      "candidate_total_raw": 18,
+      "match_edges": 10,
+      "unique_candidates_after_dedup": 8,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_125",
+      "models": {
+        "baseline": 1,
+        "cappyv2": 1
+      },
+      "candidate_total_raw": 2,
+      "match_edges": 1,
+      "unique_candidates_after_dedup": 1,
+      "additional_candidates_unmatched": 0,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_127",
+      "models": {
+        "baseline": 0,
+        "cappyv2": 1
+      },
+      "candidate_total_raw": 1,
+      "match_edges": 0,
+      "unique_candidates_after_dedup": 1,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 0,
+      "unmatched_candidate_ids": [
+        "cappyv2:1"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_128",
+      "models": {
+        "baseline": 14,
+        "cappyv2": 14
+      },
+      "candidate_total_raw": 28,
+      "match_edges": 16,
+      "unique_candidates_after_dedup": 12,
+      "additional_candidates_unmatched": 1,
+      "additional_candidates_unmatched_small": 1,
+      "unmatched_candidate_ids": [
+        "baseline:11"
+      ],
+      "missing_models": [
+        "cp050"
+      ]
+    }
+  ],
+  "excluded_missing": [
+    {
+      "case_id": "case_045",
+      "reason": "no_candidate_evidence",
+      "missing_models": [
+        "cappyv2",
+        "cp050",
+        "baseline"
+      ]
+    },
+    {
+      "case_id": "lv2-case_089",
+      "reason": "zero_candidates",
+      "missing_models": [
+        "cp050"
+      ]
+    },
+    {
+      "case_id": "lv2-case_119",
+      "reason": "zero_candidates",
+      "missing_models": [
+        "cp050"
+      ]
+    }
+  ],
+  "metrics": {
+    "unique_candidates_per_exam": {
+      "per_exam": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        4,
+        5,
+        5,
+        5,
+        6,
+        7,
+        8,
+        8,
+        10,
+        10,
+        10,
+        10,
+        11,
+        11,
+        12,
+        12,
+        12,
+        13,
+        15,
+        17,
+        29,
+        35,
+        55
+      ],
+      "denominator_exams": 38,
+      "numerator_total": 339,
+      "mean_exact": "339/38",
+      "mean": 8.9211,
+      "median": 5.5,
+      "min": 1,
+      "max": 55,
+      "q1": 2.0,
+      "q3": 11.0
+    },
+    "additional_candidates_per_exam": {
+      "per_exam": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        4,
+        6,
+        7,
+        8,
+        10,
+        10
+      ],
+      "denominator_exams": 38,
+      "numerator_total": 74,
+      "mean_exact": "37/19",
+      "mean": 1.9474,
+      "median": 1.0,
+      "min": 0,
+      "max": 10,
+      "q1": 0.0,
+      "q3": 2.0
+    },
+    "additional_small_candidates_per_exam": {
+      "per_exam": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        4,
+        6,
+        6,
+        7,
+        8,
+        10
+      ],
+      "denominator_exams": 38,
+      "numerator_total": 63,
+      "mean_exact": "63/38",
+      "mean": 1.6579,
+      "median": 1.0,
+      "min": 0,
+      "max": 10,
+      "q1": 0.0,
+      "q3": 2.0
+    },
+    "largest_single_model_candidates_per_exam": {
+      "per_exam": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+        6,
+        7,
+        7,
+        8,
+        9,
+        9,
+        10,
+        10,
+        10,
+        10,
+        11,
+        13,
+        13,
+        14,
+        15,
+        16,
+        28,
+        30,
+        53
+      ],
+      "denominator_exams": 38,
+      "numerator_total": 326,
+      "mean_exact": "163/19",
+      "mean": 8.5789,
+      "median": 5.5,
+      "min": 1,
+      "max": 53,
+      "q1": 2.0,
+      "q3": 10.0
+    }
+  },
+  "flags": {
+    "exploratory": true,
+    "clinical_validation": false,
+    "cohort_is_demo_selection": true,
+    "not_clinical_sensitivity": true,
+    "no_time_metric": true
+  },
+  "notes": "중복 제거 기준과 분모는 evidence.json rules 와 docs/review-load-metric.md 에 고정했다. 이 수치는 후보 부하 계수이며 임상 민감도·업무시간 절감이 아니다."
+}
