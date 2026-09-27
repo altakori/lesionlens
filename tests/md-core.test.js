@@ -126,3 +126,19 @@ test('queue keeps synthetic pairs adjacent, one card per study, the demo card la
  assert.equal(counts.reviewed,1);assert.equal(counts.sent,1);assert.equal(counts.pending,9);
  assert.deepEqual(M.filterCounts(cases,{},state,'case_06'),M.queueFilters.reduce((o,f)=>(o[f]=f==='pending'||f==='all'||f==='series'||f==='demo'?1:0,o),{}));
 });
+test('reviewCandidates counts places a reviewer re-opens, not model-pair rows', () => {
+  // evidence.reasons는 모델 쌍마다 반복된다. 같은 candidateId가 세 쌍에 나오면 후보는 1개다.
+  const e = {models:{baseline:[],cappyv2:[],cp050:[]}, reasons:[
+    {candidateId:'c1',model:'baseline',otherModel:'cappyv2',voxel:[1,2,3],slice:10},
+    {candidateId:'c1',model:'baseline',otherModel:'cp050',voxel:[1,2,3],slice:10},
+    {candidateId:'c2',model:'cappyv2',otherModel:'cp050',voxel:[4,5,6],slice:20,smallAdditional:true},
+    {candidateId:'c2',model:'cp050',otherModel:'baseline',voxel:[4,5,6],slice:20},
+    {candidateId:'c3',model:'cp050',voxel:[7,8,9],slice:30}]};
+  const c = M.reviewCandidates(e);
+  assert.equal(c.length, 3, '쌍 행 5개라도 고유 후보는 3개');
+  assert.deepEqual(c.map(x=>x.candidateId), ['c1','c2','c3'], '절편 순서로 안정 정렬');
+  assert.deepEqual(c[0].pairs.sort(), ['cappyv2','cp050'], '짝 모델은 후보에 남긴다');
+  assert.equal(c[1].small, true);
+  assert.deepEqual(M.reviewCandidates({models:{}, reasons:[]}), []);
+  assert.deepEqual(M.reviewCandidates(null), [], '근거 없이는 0개(칩은 근거 미산출 문구를 쓴다)');
+});

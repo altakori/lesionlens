@@ -100,9 +100,14 @@
   // 모델별 후보 수·mL·전체 mL는 그대로 아래 AI 소견 표에 남는다.
   function triageStrip(c,e){
     const strip=el('div',null,'md-triage');
-    if(!e){strip.append(el('span','AI 비교 근거 미산출','md-stat md-stat-warn'));return strip;}
-    const n=e.reasons?e.reasons.length:0;
-    strip.append(el('span',n?'불일치 '+n+'곳':'불일치 없음','md-stat'+(n?' md-stat-lead':'')));
+    const modelKeys=e&&e.models?Object.keys(e.models):[];
+    if(!e||!modelKeys.length){strip.append(el('span','AI 비교 근거 미산출','md-stat md-stat-warn'));return strip;}
+    // evidence.reasons 는 모델 쌍마다 같은 병변을 반복 기록한다(case_035 35행 / 실제 후보 24개).
+    // 카드는 의료진이 다시 열어 볼 후보 수를 세야 하므로 상세 화면과 같은 병합 단위를 쓴다.
+    const n=M.reviewCandidates(e).length;
+    const total=modelKeys.reduce((s,k)=>s+((e.models[k]&&e.models[k].candidates)||[]).length,0);
+    const label=!n?(total?'모델 간 차이 없음':'모델 후보 없음'):('재검토 후보 '+n+'개');
+    strip.append(el('span',label,'md-stat'+(n?' md-stat-lead':'')));
     const avail=M.models.map(k=>(e.models&&e.models[k])||(c.models&&c.models[k])).filter(Boolean);
     const sizes=avail.map(m=>Number(m.maxVolumeMl??Math.max(0,...(m.componentVolumesMl||[0])))).filter(Number.isFinite);
     // 모델별 후보 수와 mL은 아래 'AI 소견·Radiomics' 표에 그대로 있다. 카드에는 목록 순서를
