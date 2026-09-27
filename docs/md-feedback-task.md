@@ -35,7 +35,8 @@ Astra: 정보 구조·시각 디자인·Notion 갱신·실데이터 및 최종 �
 
 ## 검증 기록
 ### 실행 근거
-- `npm test`: Node 43/43 통과. Python 79 실행, 74 통과·5 건너뜀(Windows 실제 symlink 생성 권한/기능 제한). 건너뛴 항목을 통과로 계산하지 않는다. `work/md-final-npm-test.log`.
+- 2026-09-27 재실측(`LesionLens_review_flow` 브랜치 `feat/review-shortcuts`): `npm run test:unit` 78/78(`node --test tests/*.test.js`), `npm run test:md` 21/21. 발표자료 v2와 다른 문서들은 이 값을 쓴다. Python 스위트(uv 네트워크 필요)와 브라우저 스위트(이 환경 Playwright 미설치)는 이 날 실행하지 않았다.
+- `npm test`(2026-09-26 작업본 기록 · 현재 수치 아님): Node 43/43 통과. Python 79 실행, 74 통과·5 건너뜀(Windows 실제 symlink 생성 권한/기능 제한). 건너뛴 항목을 통과로 계산하지 않는다. `work/md-final-npm-test.log`.
 - `CHROME_EXECUTABLE='C:/Program Files/Google/Chrome/Application/chrome.exe' npm run test:browser`: 실제 Chrome 성공. XOR·잘못 저장된 초안 복원·실패/재시도·메모 폐기 확인·수신 확인·재검토 회귀 포함. `work/md-final-browser.log`.
 - `npm run serve`: 시작 시 원본 hash/geometry, 전체 3D masks, 5건·640슬라이스의 이미지·manifest·후보 대응을 재검증한다. `work/md-server-final.log`의 sourceBound=true 및 `/data/model_compare/evidence.json` HTTP 200/5건 확인. 증거 위조/변경/의존성 부재는 404로 차단한다. 서버 시작에 수 분이 걸릴 수 있다.
 - 독립 실제 화면 검사: CT lazy load, 네 canvas 절편 일치, overlay off 픽셀 일치, 공통 pan/대비, 방식 복원, case_045 결측 모델 3개가 다른 예측으로 대체되지 않음. `qa/md-feedback/independent-browser.json`.
