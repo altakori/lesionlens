@@ -321,11 +321,13 @@
   // 바뀌지 않는다. gtBasis 단위는 cm3(=mL)로, GT class 2 복셀 수 x 복셀 부피로 계산한 값이다
   // (예 case_065: 1,670복셀 x 0.625^2 x 0.8mm = 0.52cm3). 382.5L가 아니라 382.5cm3가 맞다.
   const syntheticSeriesGroups = [
-    {patientId:'DEMO-SERIES-1', prior:'case_065', current:'lv2-case_117', intervalMonths:7, gtBasis:'GT 병변 0.5cm³ → 382.5cm³'},
-    {patientId:'DEMO-SERIES-2', prior:'lv2-case_125', current:'case_129', intervalMonths:14, gtBasis:'GT 병변 0.6cm³ → 664.6cm³'},
-    {patientId:'DEMO-SERIES-3', prior:'case_083', current:'lv2-case_118', intervalMonths:5, gtBasis:'GT 병변 0.04cm³ → 348.1cm³'},
+    // priorGt/currentGt는 work/gt_geom_local.json의 vol 값(cm3)을 그대로 쓴다.
+    {patientId:'DEMO-SERIES-1', prior:'case_065', current:'lv2-case_117', intervalMonths:7, priorGt:'0.5', currentGt:'382.5'},
+    {patientId:'DEMO-SERIES-2', prior:'lv2-case_125', current:'case_129', intervalMonths:14, priorGt:'0.6', currentGt:'664.6'},
+    {patientId:'DEMO-SERIES-3', prior:'case_083', current:'lv2-case_118', intervalMonths:5, priorGt:'0.04', currentGt:'348.1'},
   ];
   const syntheticSeriesLabel = '합성 구성 · 실제 환자의 경과 아님';
+  const gtLabel = cm3 => `GT 병변 ${cm3}cm³`;
   function syntheticSeriesFor(alias) {
     const hit = syntheticSeriesGroups.find(g => g.prior === alias || g.current === alias);
     if (!hit) return null;
@@ -333,8 +335,15 @@
     const other = asPrior ? hit.prior : hit.current;
     const receipt = studyReceipt(other);
     return {patientId:hit.patientId, relation:asPrior ? 'prior' : 'next', other,
-      assumedDate:`현재보다 약 ${hit.intervalMonths}개월 ${asPrior ? '전' : '후'}`, gtBasis:hit.gtBasis,
+      assumedDate:`약 ${hit.intervalMonths}개월 ${asPrior ? '전' : '후'}`,
+      gtBasis:`GT 병변 ${hit.priorGt}cm³ → ${hit.currentGt}cm³`,
+      otherGt:asPrior ? hit.priorGt : hit.currentGt, selfGt:asPrior ? hit.currentGt : hit.priorGt,
       viewable:!!receipt && receipt.manifestPath === seriesManifestPath};
+  }
+  // 시리즈에 속한 검사는 목록에서 짝과 붙여 보여준다. 순위 근거가 아니라 나열 순서만 바꾼다.
+  function syntheticPairFor(alias) {
+    const hit = syntheticSeriesGroups.find(g => g.prior === alias || g.current === alias);
+    return hit || null;
   }
   function studyReceipt(alias) { return studyReceipts.find(r => r.alias === alias) || null; }
   function duplicateStudies(c) {
@@ -353,9 +362,9 @@
     const r = studyReceipt(c.id);
     const syn = syntheticSeriesFor(c.id);
     const current = {alias:c.id, relation:'current', label:seriesRelations.current,
-      viewable:!r || r.manifestPath === seriesManifestPath};
+      viewable:!r || r.manifestPath === seriesManifestPath, gtVolume:syn ? gtLabel(syn.selfGt) : null};
     const other = syn ? {alias:syn.other, relation:syn.relation, label:seriesRelations[syn.relation],
-      assumedDate:syn.assumedDate, viewable:syn.viewable} : null;
+      assumedDate:syn.assumedDate, viewable:syn.viewable, gtVolume:gtLabel(syn.otherGt)} : null;
     const studies = !syn ? [current] : syn.relation === 'prior' ? [other, current] : [current, other];
     return {kind:'study-series-v2', patientId:syn ? syn.patientId : null,
       patientIdBasis:syn ? '합성 구성 · 실제 환자 키 아님' : 'Dataset003_Liver는 환자당 CT 1건 · 환자 키 없음',
@@ -397,14 +406,43 @@
     if (e.reasons.length) return '모델 간 불일치' + (e.reasons.some(r => r.smallAdditional) ? ' · 작은 추가 후보' : '');
     return e.missingModels.length ? '비교 자료 일부 없음 · 사용 가능한 모델 사이 불일치 미검출' : '잠정 규칙상 불일치 미검출 · 일치 ≠ 정확';
   }
+  const queueFilters = ['pending','reviewed','sent','series','demo','all'];
+  const queueFilterLabels = {pending:'미검토', reviewed:'검토 완료', sent:'전송됨',
+    series:'검사 시리즈', demo:'시연 순서', all:'전체'};
+  // 시연 순서 = 합성 시리즈 3쌍(이전→현재) + 흐름 시연 카드. 발표 대본이 이 순서를 따른다.
+  const demoSeriesIds = new Set(syntheticSeriesGroups.flatMap(g => [g.prior, g.current]));
+  function filterCounts(cases, evidence, state, search='') {
+    // 목록이 실제로 보여주는 개수와 같은 규칙(중복 제거까지)로 세야 알약 숫자와 카드 수가 어긋나지 않는다.
+    // 별도 계산하면 목록에서 중복이 제거되는 후 수자가 목록과 떨어진다.
+    const out = {};
+    for (const f of queueFilters) out[f] = queue(cases, evidence, state, f, search).length;
+    return out;
+  }
   function queue(cases, evidence, state, filter='pending', search='') {
     const sent = new Set(Object.values(state.sends).map(r => r.case.id));
     const ordered = cases.filter(c => c.id.toLowerCase().includes(search.toLowerCase()) &&
-      (filter === 'all' || filter === 'pending' && !state.reviews[c.id] || filter === 'reviewed' && state.reviews[c.id] || filter === 'sent' && sent.has(c.id)))
+      (filter === 'all' || filter === 'pending' && !state.reviews[c.id] || filter === 'reviewed' && state.reviews[c.id] ||
+       filter === 'sent' && sent.has(c.id) ||
+       filter === 'series' && !!syntheticPairFor(c.id) && !c.synthetic ||
+       filter === 'demo' && (c.synthetic === true || demoSeriesIds.has(c.id))))
       .sort((a,b) => Number(!!evidence[b.id]?.reasons.length) - Number(!!evidence[a.id]?.reasons.length) || a.id.localeCompare(b.id));
     // 같은 검사가 카드로 두 번 뜨지 않게, image sha256가 같은 별칭은 앞에 정렬된 하나만 남긴다.
     const seen = new Set();
-    return ordered.filter(c => { const key = studyIdentityKey(c); if (seen.has(key)) return false; seen.add(key); return true; });
+    const deduped = ordered.filter(c => { const key = studyIdentityKey(c); if (seen.has(key)) return false; seen.add(key); return true; });
+    // 합성 시리즈 짝은 붙여 놓는다(이전 → 현재). DEMO 카드는 항상 마지막.
+    const byId = new Map(deduped.map(c => [c.id, c]));
+    const out = []; const placed = new Set();
+    for (const c of deduped) {
+      if (placed.has(c.id)) continue;
+      const pair = syntheticPairFor(c.id);
+      if (!pair) { placed.add(c.id); out.push(c); continue; }
+      // 짝은 항상 이전 → 현재 순으로 붙인다. 카드가 서로 떨어져 있으면 경과 흐름이 읽히지 않는다.
+      for (const id of [pair.prior, pair.current]) {
+        if (placed.has(id) || !byId.has(id)) continue;
+        placed.add(id); out.push(byId.get(id));
+      }
+    }
+    return out.filter(c => !c.synthetic).concat(out.filter(c => c.synthetic));
   }
   async function digest(text) {
     const hash = await g.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -412,6 +450,7 @@
   }
   const api = {followupOptions,followupLabels,followupLabel,precheckOptions,precheckLabels,precheckLabel,reviewCandidates,candidateLabel,biopsyCandidateLabel,
     visitOptions,visitLabels,visitLabel,visitStatus,studyReceipts,syntheticSeriesGroups,duplicateStudies,studyIdentityKey,priorStudyFor,
-    biopsyProtocolOptions,biopsyProtocolLabels,biopsyProtocolLabel,protocolGuide,seriesFor,seriesSummary,seriesRelations,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
+    biopsyProtocolOptions,biopsyProtocolLabels,biopsyProtocolLabel,protocolGuide,seriesFor,seriesSummary,
+    seriesGroupFor:syntheticPairFor,queueFilters,queueFilterLabels,filterCounts,seriesRelations,validateViewpoint,attachViewpoint,labels,models,demo,eligible,availableModel,selection,normalizeReferences,normalizeDraft,localDemoEnvelope,isLocalRecord,recordLink,snapshotCase,store,reason,queue,digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else g.MD = api;
 })(globalThis);

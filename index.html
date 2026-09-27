@@ -6,7 +6,7 @@
 <nav class="md-send-navigation" aria-label="로컬 전달 기록"><a href="recipient.html#mode=sent">보낸 사례</a><a href="recipient.html#mode=inbox">LOCAL DEMO 수신함</a></nav>
 <main id="workspace"><section id="mdQueue" class="md-queue" aria-label="재검토 CT 목록"><h1>재검토 CT 목록</h1>
 <p>목록 개선 시안 · LOCAL DEMO · 실제 병원 전송 아님 · 확인함은 정상 판정이 아닙니다.</p>
-<div class="md-queue-tools md-tools"><label>상태<select id="mdFilter"><option value="pending">미검토</option><option value="reviewed">검토 완료</option><option value="sent">전송됨</option><option value="all">전체</option></select></label><label>CT ID 검색<input type="search" id="mdSearch"></label></div>
+<div class="md-queue-tools md-tools"><label>상태<select id="mdFilter"><option value="pending">미검토</option><option value="reviewed">검토 완료</option><option value="sent">전송됨</option><option value="series">검사 시리즈</option><option value="demo">시연 순서</option><option value="all">전체</option></select></label><div id="mdFilterTabs" class="md-filter-tabs" role="group" aria-label="목록 필터"></div><label>CT ID 검색<input type="search" id="mdSearch"></label></div>
 <p id="mdStatus" role="status" aria-live="polite">자료 불러오는 중…</p>
 <details class="md-rules md-support"><summary>잠정 정렬/매칭 기준 · 임상 미검증</summary><p>전체 3D 26-연결 후보. 모델 간 교집합 / 작은 후보 voxel 수 ≥ 0.1이면 대응 (다대다, split/merge 표시). 대응 없는 후보 중 ≤ 1 mL이며 같은 모델에 더 큰 주 후보가 있을 때만 작은 추가 후보로 표시합니다. 단독 작은 후보는 이 태그를 받지 않습니다. 확인된 위치 근거가 있는 불일치 사례 먼저, 나머지 다음; 각 그룹 CT ID 오름차순. GT·개수 차이는 이유/순위에 쓰지 않습니다. 결측 모델과 모델들이 함께 놓친 영역은 평가할 수 없습니다.</p></details>
 <section id="mdSendResult" class="md-send-result" role="status" aria-live="polite"></section>

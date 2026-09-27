@@ -74,13 +74,14 @@ test('synthetic study series pairs three burden-ordered cases and never drops th
    assert.ok(!used.has(alias),alias+' appears in only one synthetic pair');used.add(alias);
    const r=M.studyReceipts.find(x=>x.alias===alias);assert.ok(r&&r.manifestPath==='data/model_compare/manifest.json',alias+' must stay viewable');
   }
-  assert.match(g.gtBasis,/cm³ → [0-9.]+cm³$/);assert.doesNotMatch(g.gtBasis,/[0-9]L/);
   const prior=M.seriesFor({id:g.prior}),current=M.seriesFor({id:g.current});
   assert.equal(prior.syntheticSeries,true);assert.equal(current.syntheticSeries,true);
   assert.equal(prior.patientId,g.patientId);assert.equal(current.patientId,g.patientId);
   assert.deepEqual(prior.studies.map(s=>s.relation),['current','next']);
   assert.deepEqual(current.studies.map(s=>s.relation),['prior','current']);
   assert.equal(current.currentIndex,1);assert.ok(current.studies[0].viewable&&prior.studies[1].viewable);
+  assert.match(current.gtBasis,new RegExp(g.priorGt+'cm\u00b3 \u2192 '+g.currentGt+'cm\u00b3$'));assert.doesNotMatch(current.gtBasis,/[0-9]L/);
+  assert.equal(current.studies[0].gtVolume,'GT 병변 '+g.priorGt+'cm\u00b3');assert.equal(current.studies[1].gtVolume,'GT 병변 '+g.currentGt+'cm\u00b3');
   assert.match(current.studies[0].assumedDate,/개월 전$/);assert.match(prior.studies[1].assumedDate,/개월 후$/);
   assert.match(prior.basis,/합성/);assert.match(current.basis,/GT 병변/);
   assert.match(M.seriesSummary({id:g.current}),/^합성 시리즈 2건 · 이전 CT 1건 · 실제 환자의 경과 아님$/);
@@ -92,4 +93,36 @@ test('synthetic study series pairs three burden-ordered cases and never drops th
   assert.equal(s.studies.length,1);assert.match(M.seriesSummary({id}),/^이 검사 1건/);
  }
  assert.equal(M.seriesFor(M.demo),null);
+});
+
+test('queue keeps synthetic pairs adjacent, one card per study, the demo card last, and offers a series filter',()=>{
+ const ids=['case_000','case_129','case_065','lv2-case_125','lv2-case_117','case_083','lv2-case_118','case_045','case_102'];
+ const cases=[...ids.map(id=>({id})),{id:'DEMO-WORKFLOW-001',synthetic:true}];
+ const state={reviews:{'case_000':true},drafts:{},sends:{'case_045':{case:{id:'case_045'}}},receipts:{}};
+ const all=M.queue(cases,{},state,'all','').map(c=>c.id);
+ assert.equal(all.length,10);assert.equal(all[all.length-1],'DEMO-WORKFLOW-001');
+ for(const g of M.syntheticSeriesGroups){
+  const i=M.queue(cases,{},state,'all','').findIndex(c=>c.id===g.prior);
+  assert.ok(i>=0,g.prior+' is listed');assert.equal(all[i+1],g.current,g.prior+' is followed by its pair');
+ }
+ assert.deepEqual(M.queue(cases,{},state,'series','').map(c=>c.id).sort(),
+  ['case_065','case_083','case_129','lv2-case_117','lv2-case_118','lv2-case_125']);
+ assert.equal(M.queue(cases,{},state,'series','').some(c=>c.synthetic),false);
+ assert.deepEqual(M.queue(cases,{},state,'series','case_06').map(c=>c.id),['case_065'],'\uac80\uc0c9\uc5d0\uc11c \uc808\ub0b4\uc9c4 \uc9dd\uc740 \ubd99\uc774\uc9c0 \uc54a\ub294\ub2e4');
+ assert.deepEqual(M.queue(cases,{},state,'pending','').map(c=>c.id).filter(id=>id==='case_065'),['case_065']);
+ assert.ok(!M.queue(cases,{},state,'reviewed','').map(c=>c.id).includes('case_065'));
+ assert.ok(M.queue(cases,{},state,'reviewed','').map(c=>c.id).includes('case_000'));
+ assert.ok(!M.queue(cases,{},state,'sent','').map(c=>c.id).includes('case_065'));
+ // 시연 순서 = 합성 시리즈 6건 + 흐름 시연 카드. 카드 순서는 이전 → 현재, 시연 카드는 마지막.
+ const demo=M.queue(cases,{},state,'demo','').map(c=>c.id);
+ assert.equal(demo[demo.length-1],'DEMO-WORKFLOW-001');
+ assert.deepEqual([...demo].sort(),[...M.syntheticSeriesGroups.flatMap(g=>[g.prior,g.current]),'DEMO-WORKFLOW-001'].sort(),'\uc2dc\uc5f0 \uc21c\uc11c\ub294 \uc2dc\ub9ac\uc988 6\uac74 + \uc2dc\uc5f0 \uce74\ub4dc \ud558\ub098');
+ for(const g of M.syntheticSeriesGroups){const i=demo.indexOf(g.prior);assert.ok(i>=0);assert.equal(demo[i+1],g.current,g.prior+' \uc55e\uc5d0 \uc774\uc804 \uac80\uc0ac\uac00 \ubb36\uc5ec \uc788\ub2e4');}
+ assert.deepEqual(demo.slice(0,2),['case_065','lv2-case_117'],'\uadf8\ub8f1 \uc21c\uc11d\uc740 CT ID \uc624\ub984\ucc28\uc21c\uc73c\ub85d \uace0\uc815\ub41c\ub2e4');
+ // 필터 개수는 목록이 실제로 보여주는 개수와 같아야 한다(중복 제거 후 기준).
+ const counts=M.filterCounts(cases,{},state,'');
+ assert.deepEqual(Object.keys(counts),M.queueFilters);
+ assert.equal(counts.all,10);assert.equal(counts.series,6);assert.equal(counts.demo,7);
+ assert.equal(counts.reviewed,1);assert.equal(counts.sent,1);assert.equal(counts.pending,9);
+ assert.deepEqual(M.filterCounts(cases,{},state,'case_06'),M.queueFilters.reduce((o,f)=>(o[f]=f==='pending'||f==='all'||f==='series'||f==='demo'?1:0,o),{}));
 });

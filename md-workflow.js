@@ -3,6 +3,7 @@
   const M=g.MD, doc=document, root=doc.getElementById('mdQueue');if(!root)return;
   const el=(tag,text,cls)=>{const n=doc.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   const status=doc.getElementById('mdStatus'), list=doc.getElementById('mdList'), filter=doc.getElementById('mdFilter'), search=doc.getElementById('mdSearch');
+  const tabs=doc.getElementById('mdFilterTabs');
   let cases=[M.demo], evidence={}, records, state, views=[], sourceContext=null;
   const say=t=>{status.textContent=t;};
   let scope='demo-only-v1';
@@ -94,23 +95,78 @@
     box.append(toggle,body,host);
     return box;
   }
-  function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();const items=M.queue(cases,evidence,state,filter.value,search.value);
+  function fmtMl(v){const n=Number(v);return Number(n.toFixed(n<1?3:2));}
+  // 2열 요약: 왜 이 CT가 목록에 있는지(불일치 몇 곳)와 규모(가장 큰 후보 몇 mL)만 보인다.
+  // 모델별 후보 수·mL·전체 mL는 그대로 아래 AI 소견 표에 남는다.
+  function triageStrip(c,e){
+    const strip=el('div',null,'md-triage');
+    if(!e){strip.append(el('span','AI 비교 근거 미산출','md-stat md-stat-warn'));return strip;}
+    const n=e.reasons?e.reasons.length:0;
+    strip.append(el('span',n?'불일치 '+n+'곳':'불일치 없음','md-stat'+(n?' md-stat-lead':'')));
+    const avail=M.models.map(k=>(e.models&&e.models[k])||(c.models&&c.models[k])).filter(Boolean);
+    const sizes=avail.map(m=>Number(m.maxVolumeMl??Math.max(0,...(m.componentVolumesMl||[0])))).filter(Number.isFinite);
+    // 모델별 후보 수와 mL은 아래 'AI 소견·Radiomics' 표에 그대로 있다. 카드에는 목록 순서를
+    // 읽는 데 쓰는 두 값만 두고 같은 숫자를 두 번 표시하지 않는다(UI_UX_GUIDE 중복 금지).
+    if(sizes.length)strip.append(el('span','가장 큰 후보 '+fmtMl(Math.max(...sizes))+' mL','md-stat'));
+    return strip;
+  }
+  // 3열 흐름: 후보 → 검토 → 전송 → 주치의 확인. 상태는 브라우저의 로컬 데모 기록에서만 온다.
+  // 실제 진료 전달·수신을 나타내지 않으므로 문구에 그 기준을 남긴다.
+  function flowState(c,state){
+    const box=el('div',null,'md-flow');
+    const receipts=state.receipts||{};
+    const sent=Object.values(state.sends).filter(r=>r.case.id===c.id);
+    const acked=sent.map(r=>receipts[r.id]).filter(Boolean).sort()[0];
+    const meter=el('div',null,'md-flow-meter');meter.setAttribute('aria-hidden','true');
+    for(const on of [true,!!state.reviews[c.id],!!sent.length,!!acked])meter.append(el('i',null,on?'on':''));
+    const text=acked?('주치의 확인 · '+acked.slice(0,10)):(sent.length?'전송됨 · 주치의 미확인':(state.reviews[c.id]?'검토됨 · 전송 대기':'미검토'));
+    box.append(meter,el('p',text,'md-flow-text'));
+    box.title='검토 → 전송 → 주치의 확인 · 이 상태는 브라우저의 로컬 데모 기록 기준입니다.';
+    return box;
+  }
+  function seriesHead(g){
+    const head=el('div',null,'md-series-head');
+    head.append(el('b',g.patientId),el('span','합성 구성 · 실제 환자의 경과 아님'),
+      el('span','GT 병변 '+g.priorGt+'cm³ → '+g.currentGt+'cm³ · 약 '+g.intervalMonths+'개월'),
+      el('span','이전 검사 → 이 검사 순'));
+    return head;
+  }
+  // 필터 알약은 목록이 실제로 보여주는 개수와 같은 규칙으로 세어야 한다.
+  function renderTabs(){
+    if(!tabs)return;
+    const counts=M.filterCounts(cases,evidence,state,search.value);
+    tabs.replaceChildren();
+    for(const f of M.queueFilters){
+      const b=el('button',M.queueFilterLabels[f]+' '+counts[f],'md-filter-tab');
+      b.type='button';b.setAttribute('aria-pressed',String(filter.value===f));
+      b.onclick=()=>{filter.value=f;render();};
+      tabs.append(b);
+    }
+  }
+  function render(){views.forEach(v=>v.close());views=[];list.replaceChildren();
+    const items=M.queue(cases,evidence,state,filter.value,search.value);renderTabs();let lastSeries=null;
     for(const c of items){const e=evidence[c.id], card=el('article',null,'md-case-card');card.dataset.caseId=c.id;
+      // 짝이 있는 검사만 시리즈 묶음으로 다룬다. 짝 없는 카드에 시리즈 토글을 남기면
+      // 볼 내용이 없는 줄이 36개 늘어난다.
+      const series=M.seriesFor(c), others=series?series.studies.filter(s=>s.relation!=='current').length:0;
+      const group=M.seriesGroupFor(c.id);
+      if(group&&group.patientId!==lastSeries)list.append(seriesHead(group));
+      lastSeries=group?group.patientId:null;
+      if(group)card.classList.add('md-in-series');
       // 코호트마다 예측 arm 수가 다르므로, 비교에 실제로 쓰인 모델 수를 카드의 보이는 줄에 남긴다.
       const arms=M.models.filter(k=>(e&&e.models&&e.models[k])||(c.models&&c.models[k]));
       const armNote=arms.length&&arms.length<M.models.length?` · AI 비교 ${arms.length}/${M.models.length}종`:'';
-      card.append(el('h2',c.id),el('strong',c.synthetic?'DEMO ONLY · 합성 워크플로 시연 · 실제 CT/환자 없음':M.reason(e)+armNote,'md-core-reason'));
-      const chips=el('div',null,'md-reason-chips md-tags');
-      if(e?.reasons.length)chips.append(el('span','모델 간 불일치','md-reason-chip md-tag'));
-      if(e?.reasons.some(r=>r.smallAdditional))chips.append(el('span','작은 추가 후보','md-reason-chip md-tag'));
-      const badge=el('span',state.reviews[c.id]?'검토 완료':'미검토','md-row-state');card.append(badge); // Reason text above already contains every tag.
-      const secondary=el('div',null,'md-card-measurements md-metrics');
-      for(const k of M.models){const m=e?.models[k]||c.models[k];secondary.append(el('p',m?`${M.labels[k]} · 3D 후보 ${m.componentCount}개 · 최대 ${Number((m.maxVolumeMl??Math.max(0,...m.componentVolumesMl)).toFixed(4))} mL · 전체 ${Number((m.totalVolumeMl??m.volumeMl).toFixed(4))} mL`:`${M.labels[k]} · 자료 없음`));}
-      // Quantitative values remain available in the existing details table.
+      const idBox=el('div',null,'md-case-id');idBox.append(el('h2',c.id));
+      if(group)idBox.append(el('span','합성 · '+group.patientId,'md-case-series-tag'));
+      card.append(idBox);
+      // 1열 검사 ID · 2열 판독 근거와 규모 · 3열 흐름 상태 · 4열 동작. 같은 결의 정보가 같은 줄에 있다.
+      const main=el('div',null,'md-case-main');
+      main.append(el('strong',c.synthetic?'DEMO ONLY · 합성 워크플로 시연 · 실제 CT/환자 없음':M.reason(e)+armNote,'md-core-reason'),triageStrip(c,e));
+      card.append(main,flowState(c,state));
       const d=details(c,e);card.append(d);const viewer=el('div',null,'md-inline-viewer');viewer.hidden=true;let view;
       // The study series belongs to the reading view, so it opens with the CT and never
       // adds a third always-visible band to the collapsed card.
-      const seriesBox=seriesBlock(c);if(seriesBox)seriesBox.hidden=true;
+      const seriesBox=others?seriesBlock(c):null;if(seriesBox)seriesBox.hidden=true;
       const open=action('CT 확대',()=>{if(viewer.hidden){d.open=false;viewer.hidden=false;if(seriesBox)seriesBox.hidden=false;view=MViewer();open.textContent='CT 접기';}else{view.close();viewer.hidden=true;if(seriesBox)seriesBox.hidden=true;open.textContent='CT 확대';}});
       function MViewer(){const v=g.MDViewer.mount(viewer,c);views.push(v);return v;}
       const review=action(state.reviews[c.id]?'다시 검토':'확인함',()=>{try{records.review(c.id,!state.reviews[c.id]);refresh();}catch(_){say('검토 저장 실패 · 상태 불변');}});

@@ -142,8 +142,8 @@ body[data-md-workflow="true"] .topbar{padding:12px max(24px,calc((100vw - 1160px
 #mdList .md-case-card:last-child{border-bottom:0}
 #mdList .md-case-card:hover{background:#fcfbff}
 #mdList .md-case-card>h2{grid-column:1;grid-row:1;margin:0;font-size:16px;overflow-wrap:anywhere}
-#mdList .md-core-reason{grid-column:2;grid-row:1;font-size:14px;line-height:1.5;margin:0}
-.md-row-state{grid-column:3;grid-row:1;font-size:12px;color:#696c7b;background:#f1f2f7;border-radius:5px;padding:4px 7px;text-align:center}
+/* .md-core-reason은 이제 .md-case-main 안의 한 줄 요약이다(아래 새 규칙에서 크기를 정한다). */
+/* .md-row-state 단품 배지는 4단계 흐름 표시(.md-flow)로 대체했다. */
 #mdList .md-case-actions{grid-column:4;grid-row:1;justify-content:flex-end;display:flex;margin:0;padding:0}
 #mdList .md-case-actions button{background:#6044b0;color:white;border-color:#6044b0;min-height:38px;padding:7px 16px;font-size:13px}
 #mdList .md-details{grid-column:2;grid-row:2;margin:0;padding:0;border:0;background:none;min-width:0}
@@ -349,3 +349,45 @@ main.md-recipient>p{font-size:13px;color:#626879;line-height:1.6;margin:0 0 12px
 .md-record-series-note { font-size:12px; color:#656b7b; line-height:1.7; margin:8px 0 0; }
 .md-record-series-dup { flex:1 1 100%; font-size:12px; color:#656b7b; margin:8px 0 0; line-height:1.6; }
 @media(max-width:480px) { .md-series { padding:10px; } .md-series-chip,.md-series-current { width:100%; } }
+
+/* ── 판독 목록 배치: 검사 ID · 판독 근거와 규모 · 흐름 상태 · 동작을 한 줄에 둔다.
+   이전에 한 줄에 몰던 ID/사유/상태/동작 네 결의 정보를 열로 분리하고, 가운데 열에는
+   판독 순서를 정하는 수치만 올린다(정확한 수치는 details 표 유지). */
+#mdList .md-case-card{grid-template-columns:152px minmax(0,1fr) 164px 152px;row-gap:10px}
+#mdList .md-case-id{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+#mdList .md-case-id h2{margin:0;font-size:16px;line-height:1.35;overflow-wrap:anywhere}
+.md-case-series-tag{font-size:11px;line-height:1.3;color:#4b4365;background:#f1eefb;border:1px solid #e3dcf6;border-radius:5px;padding:2px 6px}
+#mdList .md-case-main{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.md-case-main .md-core-reason{font-size:14px;line-height:1.45;margin:0}
+.md-triage{display:flex;flex-wrap:wrap;gap:6px}
+.md-stat{font-size:13px;line-height:1.4;color:#4b4e5d;background:#f2f3f8;border-radius:6px;padding:3px 8px;font-variant-numeric:tabular-nums}
+.md-stat-lead{background:#ece5fd;color:#3d2d68;font-weight:600}
+.md-stat-warn{background:#fdf2e6;color:#7a5620}
+.md-flow{grid-column:3;grid-row:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.md-flow-meter{display:flex;gap:3px}
+.md-flow-meter i{flex:1 1 auto;max-width:36px;height:4px;border-radius:2px;background:#e3e5ee}
+.md-flow-meter i.on{background:#6044b0}
+.md-flow-text{margin:0!important;font-size:11px;line-height:1.3;color:#585c6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mdList .md-case-card.md-in-series{border-left:3px solid #cec2ee;background:#fdfcff}
+#mdList .md-case-card.md-in-series:hover{background:#faf8ff}
+.md-series-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding:8px 20px;background:#f7f5fd;border-bottom:1px solid #e6e3f2;font-size:12px;color:#4b4365}
+.md-series-head b{font-size:12px}
+.md-series-head span{color:#787c8c}
+.md-filter-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.md-filter-tab{font-size:12px;line-height:1.2;padding:6px 11px;min-height:34px;border:1px solid #dfe2ed;border-radius:999px;background:#fff;color:#545869;font-variant-numeric:tabular-nums}
+.md-filter-tab:hover{border-color:#c9c2e0}
+.md-filter-tab[aria-pressed="true"]{background:#53408f;border-color:#53408f;color:#fff;font-weight:600}
+@media(max-width:1120px){#mdList .md-case-card{grid-template-columns:132px minmax(0,1fr) 140px 148px}}
+@media(max-width:900px){#mdList .md-case-card{grid-template-columns:124px minmax(0,1fr) minmax(96px,.55fr) 142px}.md-flow-meter i{max-width:26px}}
+@media(max-width:680px){
+#mdList .md-case-card{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
+#mdList .md-case-id{grid-column:1;grid-row:1}
+.md-flow{grid-column:2;grid-row:1;align-items:flex-end;text-align:right}
+.md-flow-meter i{max-width:22px}
+#mdList .md-case-main{grid-column:1/-1;grid-row:2}
+#mdList .md-details{grid-column:1/-1;grid-row:3}
+#mdList .md-case-actions{grid-column:1/-1;grid-row:4;justify-content:flex-start}
+.md-decision-actions{grid-column:1/-1;grid-row:5;justify-content:flex-start}
+.md-case-card:has(.md-details[open]) .md-decision-actions{grid-row:6}
+.md-series-head{padding:8px 16px}
+}
