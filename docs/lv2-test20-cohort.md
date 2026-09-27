@@ -19,9 +19,14 @@ held-out 20건 test set가 남아 있었고(아래 표), 이건 비교 큐의 �
 - 실행 인자: 각 dir의 `predict_from_raw_data_args.json`(baseline은 `.../baseline/.../imagesTs`를 지정), `summary.json`.
 - 클래스 정의(`dataset.json`): background 0, liver 1, **lesion 2**, numTraining 196.
   앱이 그리는 마스크는 `prepare_model_compare.canonical_arrays()`가 **class 2만** 추출한 병변 표시다.
-- 두 모델의 학습 자료와 test 20건은 겹치지 않는다. imagesTr 목록을 전수 대조한 결과
-  baseline 111건·cappy_v2 196건 중에 case_041, 089, 113~130 **20건 ID가 하나도 없다**
-  (`grep -cx`로 20/20 확인, 2026-09-27) → 20건은 두 트레이너 모두에게 held-out.
+- 두 모델의 학습 자료와 test 20건은 겹치지 않는다. `imagesTr`/`imagesTs` 파일명에서
+  `_0000.nii.gz`를 벗긴 ID 집합으로 대조했다(2026-09-27 재확인).
+  - baseline: train 111건(case_000~case_112) · test 23건 · train∩test = 0
+  - cappy_v2: train 196건(case_000~case_215 중 196) · test 20건 · train∩test = 0
+  - test 20건(case_041, 089, 113~130)은 두 트레이너 train ID 집합에 **모두 없음** → held-out.
+  (처음 확인에서는 파일명 치환 실수로 매치가 성립하지 않아 0건이 나왔고, 위 방식으로 다시 확인했다.)
+- 파일명은 `case_XXX_0000.nii.gz` 하나로 **환자·검사·날짜 키가 없다**. 그래서 이 데이터셋에서는
+  같은 환자의 이전·다음 검사를 만들 근거가 없고, GT 모양 유사성으로 추정하면 그건 가정이다.
 - run이 자체 보고한 class 2(Dataset003 = LiTS 계열) 평균: baseline Dice 0.4872(FN 113,276 FP 26,785),
   CAPPYv2 Dice 0.5494(FN 107,130 FP 30,330). 이건 **해당 실행의 자체 요약**이고 이 프로젝트의 성능 주장이 아니다.
 
