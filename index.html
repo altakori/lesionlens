@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head><link rel="icon" href="data:,"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"><meta name="robots" content="noindex,nofollow"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="LesionLens — AI가 다르게 표시한 CT를 찾아, 의료진이 다시 확인할 수 있도록 도와요."><title>LesionLens · 한 번 더 살펴보기</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235947b6'/%3E%3Cpath d='M10 8v16h13v-4h-9V8z' fill='white'/%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="md-workflow.css"></head>
+<body data-md-workflow="true" data-demo-mode="public-static">
+<header class="topbar"><a class="brand" href="#mdQueue">LesionLens</a><div class="md-header-actions"><details class="md-demo-info"><summary aria-label="데모 안내"><span class="md-demo-badge">DEMO</span><span class="md-info-icon" aria-hidden="true">ⓘ</span></summary><div class="md-info-popover"><strong>공개 웹 시연 · 진료용 아님</strong><p>이 브라우저에만 저장되며 실제 환자·주치의 연결이나 병원 전송은 없습니다. 검토 완료·수신 확인은 진료 판단이 아닙니다.</p><p>GT는 참조 정답이며 정렬·모델 비교는 임상 미검증입니다. 합성 검사 이력은 실제 환자 경과가 아닙니다.</p></div></details><nav class="md-send-navigation" aria-label="데모 화면"><a href="recipient.html#mode=inbox">DEMO 수신함</a></nav></div></header>
+<main id="workspace"><section id="mdQueue" class="md-queue" aria-label="재검토 CT 목록">
+<div class="md-dashboard-head"><div class="md-dashboard-title"><h1>재검토 CT 목록</h1><p>한 번 더 살펴볼 근거를 확인하세요.</p></div>
+<div class="md-queue-tools"><div id="mdFilterTabs" class="md-filter-tabs" role="group" aria-label="목록 필터"></div><label class="md-search-label" for="mdSearch">번호 검색<input type="search" id="mdSearch" placeholder="번호 또는 CT ID" autocomplete="off"></label></div></div>
+<div class="md-list-context"><span>DEMO · 실제 병원 전송 아님</span><span id="mdListCount"></span></div>
+<p id="mdStatus" role="status" aria-live="polite">자료 불러오는 중…</p>
+
+<section id="mdSendResult" class="md-send-result" role="status" aria-live="polite"></section>
+<div id="mdList" class="md-case-list"></div></section>
+<details class="md-rules md-support"><summary>잠정 정렬/매칭 기준 · 임상 미검증</summary><p>전체 3D 26-연결 후보. 모델 간 교집합 / 작은 후보 voxel 수 ≥ 0.1이면 대응 (다대다, split/merge 표시). 대응 없는 후보 중 ≤ 1 mL이며 같은 모델에 더 큰 주 후보가 있을 때만 작은 추가 후보로 표시합니다. 단독 작은 후보는 이 태그를 받지 않습니다. 확인된 위치 근거가 있는 불일치 사례 먼저, 나머지 다음; 각 그룹 CT ID 오름차순. GT·개수 차이는 이유/순위에 쓰지 않습니다. 결측 모델과 모델들이 함께 놓친 영역은 평가할 수 없습니다.</p></details>
+<details class="md-hospital-model md-support"><summary>병원 모델 입력 · UI only</summary><p>업로드·학습·추론은 연결되지 않았습니다.</p><button disabled>모델 데이터 연결 · 준비 중</button></details>
+</main>
+<dialog id="mdSendDialog" class="md-send-dialog"></dialog>
+<footer class="md-footer"><a href="NOTICE.html">데이터 출처·이용조건</a> · LesionLens · 공개 웹 데모</footer>
+<script src="app.js"></script><script src="public-runtime.js"></script><script src="md-core.js"></script><script src="md-viewer.js"></script><script src="md-workflow.js"></script></body></html>
