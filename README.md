@@ -1,13 +1,15 @@
-# LesionLens · public competition demo
+# LesionLens
 
-Play: https://altakori.github.io/lesionlens-demo/
+[공개 앱](https://altakori.github.io/lesionlens/) · [개발 소스 기본 브랜치 스냅샷](source/README.md)
 
-This is a sanitized, standalone static export. The private development repository and its history are not published. It contains only six displayed CT cases in three synthetic paired series and client-side demo code.
+개발 소스와 기존 공개 배포 이력을 한 공개 저장소로 통합했습니다.
 
-Select a row, compare CT/GT/model overlays, choose an opinion, and save it to the DEMO inbox. Records are browser-local: no hospital transmission, patient matching, remote persistence, diagnosis, or validated clinical decision support. Do not enter real patient information. Other devices do not share the records.
+- `source/`: 원래 개발 저장소의 기본 브랜치 `feat/mvp` 파일 스냅샷입니다. 다른 개발 브랜치의 최신 상태를 뜻하지 않습니다.
+- `source/*` 브랜치: 원래 개발 저장소의 모든 브랜치를 원래 커밋 그대로 보존합니다.
+- `legacy/source-pr/*`: 기존 개발 PR의 Git 커밋을 보존합니다.
+- `pages`: 기존 공개 배포 파일을 보존하고 새 저장소 주소에 맞춘 브랜치입니다. GitHub Pages는 이 브랜치의 정적 파일을 사용합니다.
+- 루트의 배포 파일과 기존 배포 브랜치 이력은 기존 공개 앱을 유지하기 위한 기록입니다.
 
-Full raw NIfTI/DICOM, model checkpoints, research scripts, private paths, source receipts, source history, and clinical identifiers are excluded. Model differences and synthetic series must not be interpreted as disease risk or real longitudinal changes.
+개발·테스트는 선택한 소스 브랜치의 README를 따릅니다. 이번 통합은 새 기능이나 성능 개선을 주장하지 않습니다.
 
-LiTS display derivatives: CC BY-NC-SA, attribution and changes in [NOTICE.html](NOTICE.html). The font has its own OFL license. Application code is not granted a separate open-source license.
-
-Pages is deployed by the workflow in this repository. To end temporary publication, disable/unpublish Pages in Settings > Pages; repository visibility changes or removal require a separate decision. Copies/forks already obtained cannot be recalled. No automatic expiry is configured.
+교육·연구용 시연 앱이며 진단·치료용 임상 검증을 완료한 제품이 아닙니다. 기존 공개 배포 자료만 유지하며 새 로컬 의료 원본이나 미커밋 자료를 업로드하지 않았습니다.

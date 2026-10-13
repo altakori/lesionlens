@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+*.nii
+*.nii.gz
+*.dcm
+*.dicom
+*.pt
+*.pth
+*.ckpt
+*.onnx
+/data/
+/artifacts/
